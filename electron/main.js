@@ -40,6 +40,7 @@ const { resolveDarwinHelperExecutable } = require("./lib/resolveNodeHelper");
 const { resolveRemoteServerUrl, isValidHttpUrl } = require("./lib/resolveRemoteServerUrl");
 const { writeRemoteServerUrl } = require("./lib/remoteServerPreferences");
 const { buildReadinessUrl, waitForServer } = require("./lib/serverReadiness");
+const { shouldStartHidden, showOrCreateWindow } = require("./lib/windowLifecycle");
 
 // ── Single Instance Lock ───────────────────────────────────
 const gotTheLock = app.requestSingleInstanceLock();
@@ -49,11 +50,7 @@ if (!gotTheLock) {
 }
 
 app.on("second-instance", () => {
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
-  }
+  showMainWindow();
 });
 
 // ── Environment Detection ──────────────────────────────────
@@ -71,6 +68,7 @@ let nextServer = null;
 let serverPort = 20128;
 let isServerStopped = false;
 let remoteServerPromptWindow = null;
+let keepAliveWithoutWindows = false;
 
 // ── Remote Server Mode ──────────────────────────────────────
 // Lets the desktop shell attach to an already-running OmniRoute server (e.g. a
@@ -366,6 +364,8 @@ function setupContentSecurityPolicy() {
 
 // ── Create Window ──────────────────────────────────────────
 function createWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) return mainWindow;
+
   // Platform-conditional options (#9)
   const platformWindowOptions =
     process.platform === "darwin"
@@ -397,16 +397,10 @@ function createWindow() {
     mainWindow.webContents.openDevTools({ mode: "detach" });
   }
 
-  // Show window when ready (unless starting minimized/hidden in tray)
+  // Hidden startup skips createWindow() entirely; any created dashboard is explicit.
   mainWindow.once("ready-to-show", () => {
-    const startHidden =
-      process.argv.includes("--hidden") ||
-      process.argv.includes("--minimized") ||
-      app.getLoginItemSettings().wasOpenedAsHidden;
-    if (!startHidden) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.show();
-    } else {
-      console.log("[Electron] Launched hidden in background tray");
     }
   });
 
@@ -437,6 +431,16 @@ function createWindow() {
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
+
+  return mainWindow;
+}
+
+function showMainWindow() {
+  return showOrCreateWindow({
+    appReady: app.isReady(),
+    getWindow: () => mainWindow,
+    createWindow,
+  });
 }
 
 // ── System Tray ────────────────────────────────────────────
@@ -465,12 +469,7 @@ function createTray() {
   const contextMenu = Menu.buildFromTemplate([
     {
       label: "Open OmniRoute",
-      click: () => {
-        if (mainWindow) {
-          mainWindow.show();
-          mainWindow.focus();
-        }
-      },
+      click: () => showMainWindow(),
     },
     {
       label: "Open Dashboard",
@@ -523,10 +522,7 @@ function createTray() {
   tray.setContextMenu(contextMenu);
 
   tray.on("double-click", () => {
-    if (mainWindow) {
-      mainWindow.show();
-      mainWindow.focus();
-    }
+    showMainWindow();
   });
 }
 
@@ -1086,9 +1082,20 @@ app.whenReady().then(async () => {
     process.argv.includes("--headless") ||
     process.argv.includes("--cli") ||
     process.env.OMNIROUTE_HEADLESS === "true";
+  const startHidden =
+    !isHeadless &&
+    shouldStartHidden({
+      argv: process.argv,
+      loginItemSettings: app.getLoginItemSettings(),
+    });
+  keepAliveWithoutWindows = startHidden;
 
   // Fix #1: Start server and WAIT for readiness before showing window
   startNextServer();
+  if (!isHeadless) {
+    createTray();
+  }
+
   let serverReady = true;
   if (!isDev) {
     // Probe the lightweight auth-exempt endpoint instead of aggregating full monitoring state.
@@ -1097,9 +1104,10 @@ app.whenReady().then(async () => {
 
   if (isHeadless) {
     console.log("[Electron] Headless mode active — UI window and tray icon skipped");
+  } else if (startHidden) {
+    console.log("[Electron] Launched hidden in background tray without a renderer");
   } else {
-    createWindow();
-    createTray();
+    showMainWindow();
   }
 
   setupIpcHandlers();
@@ -1107,7 +1115,7 @@ app.whenReady().then(async () => {
 
   // If readiness timed out (e.g. very long first-launch migrations), don't leave the
   // window stuck on a hanging connection — keep polling and reload once it responds (#2460).
-  if (!isDev && !serverReady && !isHeadless) {
+  if (!isDev && !serverReady && !isHeadless && !startHidden) {
     void waitForServer(getServerReadinessUrl(), 300000).then((ready) => {
       if (ready && mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.loadURL(getServerUrl());
@@ -1125,11 +1133,7 @@ app.whenReady().then(async () => {
   // macOS: recreate window when dock icon clicked
   app.on("activate", () => {
     if (isHeadless) return;
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    } else if (mainWindow) {
-      mainWindow.show();
-    }
+    showMainWindow();
   });
 });
 
@@ -1139,7 +1143,7 @@ app.on("window-all-closed", () => {
     process.argv.includes("--headless") ||
     process.argv.includes("--cli") ||
     process.env.OMNIROUTE_HEADLESS === "true";
-  if (process.platform !== "darwin" && !isHeadless) {
+  if (process.platform !== "darwin" && !isHeadless && !keepAliveWithoutWindows) {
     app.quit();
   }
 });

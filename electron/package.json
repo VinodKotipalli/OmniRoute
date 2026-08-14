@@ -64,6 +64,7 @@
       "remoteServerPromptRenderer.js",
       "lib/resolveServerEntry.js",
       "lib/resolveNodeHelper.js",
+      "lib/windowLifecycle.js",
       "lib/resolveRemoteServerUrl.js",
       "lib/remoteServerPreferences.js",
       "lib/serverReadiness.js",
