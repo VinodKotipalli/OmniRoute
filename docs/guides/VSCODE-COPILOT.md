@@ -91,18 +91,32 @@ extension.
 ## Dashboard inside a VS Code tab
 
 `omnicopilot.dashboardOpen: "editor"` renders the OmniRoute dashboard in an editor tab via the
-Simple Browser instead of an external browser. Embedding is **opt-in on the server**: start
-OmniRoute with
+Simple Browser instead of an external browser. Embedding is **opt-in on the server** through
+`DASHBOARD_ALLOW_EMBED=vscode`, which serves the HTML pages with
+`frame-ancestors 'self' vscode-webview:` instead of the default `frame-ancestors 'none'` +
+`X-Frame-Options: DENY`. The API surface (`/api`, `/v1`, `/v1beta`, `/a2a`, `/healthz`) keeps the
+strict headers either way.
+
+> ⚠️ **It is a build-time flag, not a runtime one.** Next.js compiles `headers()` into the route
+> manifest, so `next.config.mjs` reads the variable while the bundle is built
+> (`next.config.mjs` → `resolveDashboardEmbedMode`, `scripts/build/dashboardEmbed.mjs`).
+> Exporting it in front of an already-built server changes nothing — the headers are baked.
 
 ```bash
-DASHBOARD_ALLOW_EMBED=vscode omniroute
+# the variable has to be present on the BUILD command
+DASHBOARD_ALLOW_EMBED=vscode npm run build        # or npm run build:release
+npm start
 ```
 
-which serves the HTML pages with `frame-ancestors 'self' vscode-webview:` instead of the default
-`frame-ancestors 'none'` + `X-Frame-Options: DENY`. The API surface (`/api`, `/v1`, `/v1beta`,
-`/a2a`, `/healthz`) keeps the strict headers either way. Without the variable the page refuses to
-frame and the extension falls back to the external browser — nothing breaks. See
-[`ENVIRONMENT.md`](../reference/ENVIRONMENT.md) and issue
+| How you installed | Can you enable embedding? |
+| --- | --- |
+| From source | ✅ set the variable on the build command, as above |
+| `npm install -g omniroute` | ❌ the published package ships a prebuilt bundle — build from source instead |
+| Docker image | ❌ the official image has no build arg for it — build your own from the `Dockerfile` with the variable set |
+
+Without an embed-enabled build the page refuses to frame, the extension detects that from the
+response headers and falls back to the external browser — nothing breaks, and it says so once.
+See [`ENVIRONMENT.md`](../reference/ENVIRONMENT.md) and issue
 [#10273](https://github.com/diegosouzapw/OmniRoute/issues/10273).
 
 ---
@@ -125,7 +139,7 @@ Kilo and Roo — the same configs described in
 | Every model appears twice | You are on an OmniCopilot older than 1.0.1 — update. The extension now requests `?prefix=alias`. |
 | An image/audio model used to be listed and is gone | Intentional since 1.0.1 — it could never answer a chat request. |
 | Panel missing from the Activity Bar | VS Code moves extra view containers into the **"…"** overflow at the bottom of the Activity Bar, and a container hidden via right-click stays hidden. Right-click the Activity Bar → tick **OmniRoute**, or open it with `OmniRoute: Manage Connection`. |
-| Dashboard opens in the browser despite `editor` mode | The server is not started with `DASHBOARD_ALLOW_EMBED=vscode` (see above). The fallback is deliberate. |
+| Dashboard opens in the browser despite `editor` mode | The server was not **built** with `DASHBOARD_ALLOW_EMBED=vscode` (see above) — setting it at startup on a prebuilt install does nothing. The fallback is deliberate. |
 | Models list is stale after changing providers | `OmniRoute: Refresh Models`, or the ↻ link in the panel. |
 
 ---
