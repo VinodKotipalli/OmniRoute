@@ -1,4 +1,4 @@
-import type { ModelPricingRegistry } from "./modelPricingRegistry.js";
+import type { ModelPricingRegistry } from "./modelPricingRegistry.ts";
 
 export type UsageStatus = "success" | "failed" | "rate_limited" | "timeout" | "cancelled";
 
