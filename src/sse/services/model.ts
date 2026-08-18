@@ -206,6 +206,24 @@ function findSyncedModelMeta(models: unknown, modelId: string): any {
   return Array.isArray(models) ? models.find((model: any) => model.id === modelId) : undefined;
 }
 
+function findLiveCatalogModelMeta(
+  providerId: string,
+  requestedModelId: string,
+  resolvedModelId: string,
+  syncedModels: unknown
+): any {
+  const directMatch = findSyncedModelMeta(syncedModels, resolvedModelId);
+  if (directMatch || !Array.isArray(syncedModels)) return directMatch;
+
+  const registryModel = findRegistryModel(providerId, requestedModelId);
+  const liveCatalogIds = registryModel?.liveCatalogIds;
+  if (!Array.isArray(liveCatalogIds) || liveCatalogIds.length === 0) return undefined;
+
+  return syncedModels.find(
+    (model: any) => typeof model?.id === "string" && liveCatalogIds.includes(model.id)
+  );
+}
+
 function resolveRuntimeFormats(customMatch: any, syncedMatch: any): RuntimeModelMeta {
   const apiFormat =
     customMatch?.apiFormat === "responses" || syncedMatch?.apiFormat === "responses"
@@ -228,8 +246,10 @@ function copySyncedThinkingMetadata(metadata: RuntimeModelMeta, syncedMatch: any
   // Only let a non-empty synced effort list override the static registry fallback;
   // an empty array from an incomplete synced discovery must not erase registry-declared
   // tiers (#9485 review).
-  if (Array.isArray(syncedMatch?.supportedThinkingEfforts) &&
-    syncedMatch.supportedThinkingEfforts.length > 0) {
+  if (
+    Array.isArray(syncedMatch?.supportedThinkingEfforts) &&
+    syncedMatch.supportedThinkingEfforts.length > 0
+  ) {
     metadata.supportedThinkingEfforts = syncedMatch.supportedThinkingEfforts;
   }
   if (typeof syncedMatch?.defaultThinkingEffort === "string") {
@@ -300,7 +320,12 @@ async function lookupModelMeta(
     // Custom models remain explicit operator overrides even when live discovery
     // is authoritative for the provider.
     const customMatch = findCustomModelMeta(customModels, resolvedModelId);
-    const syncedMatch = findSyncedModelMeta(syncedModels, resolvedModelId);
+    const syncedMatch = findLiveCatalogModelMeta(
+      providerId,
+      modelId,
+      resolvedModelId,
+      syncedModels
+    );
     const registryMatch = findRegistryModel(providerId, resolvedModelId);
     const effortBaseModelId = getRegisteredProviderEffortBaseModelId(providerId, modelId);
 
