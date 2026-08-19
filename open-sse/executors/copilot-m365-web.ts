@@ -5,8 +5,13 @@ import { BaseExecutor, type ExecuteInput, type ExecutorLog } from "./base.ts";
 import {
   buildPrompt,
   buildWsUrl,
+  currentM365AccessToken,
+  currentM365ChathubPath,
+  decodeJwtClaims,
   redactWsUrl,
+  refreshM365AccessToken,
   resolveConnectionParams,
+  tokenNeedsRefresh,
 } from "./copilot-m365-connection.ts";
 import {
   accumulateBotContent,
@@ -17,7 +22,7 @@ import {
   handshakeFrame,
   isCompletionFrame,
   isUpdateFrame,
-  keepaliveFrame,
+  metricsFrame,
   parseFrame,
   resolveChatInvocationOverrides,
   resolveToneForModel,
@@ -152,8 +157,17 @@ export class CopilotM365WebExecutor extends BaseExecutor {
 
           try {
             const wsUrlParts = new URL(input.wsUrl);
-            const traceId = wsUrlParts.searchParams.get("clientrequestid") ?? crypto.randomUUID().replace(/-/g, "");
+            // #10718 — the invocation must echo the ids riding in the WS URL query
+            // (conversationId is cross-checked server-side). traceId is a fresh GUID
+            // per turn, as in the browser capture.
+            const requestId =
+              wsUrlParts.searchParams.get("chatsessionid") ??
+              wsUrlParts.searchParams.get("clientrequestid") ??
+              crypto.randomUUID();
             const sessionId = wsUrlParts.searchParams.get("X-SessionId") ?? crypto.randomUUID();
+            const conversationId =
+              wsUrlParts.searchParams.get("ConversationId") ?? crypto.randomUUID();
+            const traceId = crypto.randomUUID();
 
             log?.debug?.("M365_WS", `connecting → ${redactWsUrl(input.wsUrl)}`);
 
@@ -166,23 +180,26 @@ export class CopilotM365WebExecutor extends BaseExecutor {
             });
 
             const sendChat = () => {
-              ws?.send(keepaliveFrame());
               const overrides = resolveChatInvocationOverrides(input.tier);
               // Model-driven tone (#7872) wins over the tier default; a bare/unknown id
               // keeps the tier tone resolved above.
               const tone = resolveToneForModel(input.model) ?? overrides.tone;
-              ws?.send(
-                encodeFrame(
-                  buildChatInvocation({
-                    text: input.prompt,
-                    traceId,
-                    sessionId,
-                    isStartOfSession: true,
-                    ...overrides,
-                    tone,
-                  })
-                )
+              const invocationFrame = encodeFrame(
+                buildChatInvocation({
+                  text: input.prompt,
+                  traceId,
+                  sessionId,
+                  requestId,
+                  conversationId,
+                  isStartOfSession: true,
+                  ...overrides,
+                  tone,
+                })
               );
+              // #10718 — the invocation and its type:1 Metrics follow-up must land
+              // in ONE socket write, exactly as the browser sends them; a bare
+              // invocation (or one preceded by a type:6 ping) is silently dropped.
+              ws?.send(invocationFrame + metricsFrame());
             };
 
             ws.on("open", () => {
@@ -273,6 +290,61 @@ export class CopilotM365WebExecutor extends BaseExecutor {
     );
   }
 
+  /**
+   * #10718 — proactively refresh the M365 access token before opening the WS.
+   * A WS-handshake 401 surfaces as an error event INSIDE the SSE stream (the HTTP
+   * response is already 200 by then), so chatCore's generic 401→refresh→retry
+   * orchestration never triggers — the refresh has to happen here, pre-flight.
+   * No-ops for legacy connections without a stored refresh_token.
+   */
+  private async ensureFreshCredentials(
+    credentials: ExecuteInput["credentials"],
+    onCredentialsRefreshed: ExecuteInput["onCredentialsRefreshed"],
+    log: ExecutorLog | null
+  ): Promise<void> {
+    const psd = (credentials?.providerSpecificData ?? {}) as JsonRecord;
+    const refreshToken =
+      credentials.refreshToken || (typeof psd.refreshToken === "string" ? psd.refreshToken : "");
+    if (!refreshToken) return;
+
+    const current = currentM365AccessToken(credentials);
+    if (current && !tokenNeedsRefresh(current)) return;
+
+    const tid =
+      decodeJwtClaims(current)?.tid || (typeof psd.tid === "string" ? psd.tid : "") || "";
+    const result = await refreshM365AccessToken(refreshToken, tid, log ?? undefined);
+    if ("error" in result) {
+      // Fall through with the existing token — the WS layer will surface the failure.
+      return;
+    }
+
+    const rotated = result.refreshToken || refreshToken;
+    const chathubPath = currentM365ChathubPath(credentials);
+    const next = {
+      ...credentials,
+      accessToken: result.accessToken,
+      refreshToken: rotated,
+      // Keep the pasted-format apiKey self-consistent so every resolution path
+      // (fresh column, stale column, dashboard re-read) sees the same token.
+      ...(chathubPath
+        ? { apiKey: `access_token=${result.accessToken}; chathubPath=${chathubPath}` }
+        : {}),
+      ...(result.expiresIn
+        ? { expiresAt: new Date(Date.now() + result.expiresIn * 1000).toISOString() }
+        : {}),
+    };
+    Object.assign(credentials, next);
+    try {
+      await onCredentialsRefreshed?.(next);
+    } catch (err) {
+      // #7676 pattern: a persistence failure must never fail the user-facing response.
+      log?.warn?.(
+        "M365_TOKEN",
+        `persisting refreshed token failed (${err instanceof Error ? err.message : String(err)}) — will re-refresh next request`
+      );
+    }
+  }
+
   async execute(input: ExecuteInput): Promise<{
     response: Response;
     url: string;
@@ -292,6 +364,12 @@ export class CopilotM365WebExecutor extends BaseExecutor {
         transformedBody: null,
       };
     }
+
+    await this.ensureFreshCredentials(
+      input.credentials,
+      input.onCredentialsRefreshed,
+      input.log ?? null
+    );
 
     const connectionParams = resolveConnectionParams(input.credentials);
     if ("error" in connectionParams) {

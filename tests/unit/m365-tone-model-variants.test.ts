@@ -30,9 +30,10 @@ test("model-driven tone overrides the tier default; bare id keeps the tier tone"
   const enterprise = resolveChatInvocationOverrides("enterprise");
   const individual = resolveChatInvocationOverrides(undefined);
 
-  // enterprise tier default tone is Magic
+  // enterprise tier default tone is Magic; individual/EDU sends "magic" (#10718
+  // recapture — the old "" default was part of the silently-dropped shape)
   assert.equal(enterprise.tone, "Magic");
-  assert.equal(individual.tone, "");
+  assert.equal(individual.tone, "magic");
 
   // precedence: resolveToneForModel(model) ?? overrides.tone  (mirrors the executor wiring)
   const toneFor = (model: string | undefined, tierTone: string) =>
@@ -44,7 +45,7 @@ test("model-driven tone overrides the tier default; bare id keeps the tier tone"
 
   // the bare id keeps whatever the tier resolved
   assert.equal(toneFor("copilot-m365", enterprise.tone), "Magic");
-  assert.equal(toneFor("copilot-m365", individual.tone), "");
+  assert.equal(toneFor("copilot-m365", individual.tone), "magic");
 });
 
 test("registry exposes the bare id (first) plus every tone variant", () => {

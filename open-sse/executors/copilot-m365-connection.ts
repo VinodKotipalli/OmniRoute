@@ -160,7 +160,16 @@ export function resolveConnectionParams(
   const psd = (credentials?.providerSpecificData ?? {}) as JsonRecord;
   const parsedApiKey =
     typeof credentials?.apiKey === "string" ? parsePastedCredential(credentials.apiKey) : {};
+  // A JWT in credentials.accessToken (3 dot-separated parts — the individual-tier
+  // token is an opaque JWE with 5) is the freshest copy: the executor refreshes it
+  // in place before resolving params, and the framework mutates it after a refresh.
+  const credentialsJwt =
+    typeof credentials?.accessToken === "string" &&
+    credentials.accessToken.split(".").length === 3
+      ? credentials.accessToken
+      : "";
   const accessToken =
+    credentialsJwt ||
     parsedApiKey.accessToken ||
     (typeof credentials?.apiKey === "string" &&
       credentials.apiKey &&
@@ -252,6 +261,135 @@ export function buildWsUrl(params: M365ConnectionParams): string {
 /** Strip the access_token from a WS URL so it is safe to log. */
 export function redactWsUrl(wsUrl: string): string {
   return wsUrl.replace(/access_token=[^&]*/i, "access_token=REDACTED");
+}
+
+// ── OAuth refresh support (#10718 — client ids observed in the browser token
+// and M365-Copilot2API) ────────────────────────────────────────────────────
+//
+// The browser-issued access_token lives ~75 minutes. These helpers redeem a
+// stored refresh_token at the Microsoft identity platform (same public client
+// the m365.cloud.microsoft web app uses) so the connection self-heals instead
+// of requiring a fresh DevTools capture after every expiry.
+
+/** Public client id observed in both the browser token and M365-Copilot2API. */
+export const M365_OAUTH_CLIENT_ID = "c0ab8ce9-e9a0-42e7-b064-33d422df41f1";
+
+export const M365_OAUTH_SCOPE =
+  "openid profile offline_access https://substrate.office.com/sydney/M365Chat.Read " +
+  "https://substrate.office.com/sydney/sydney.readwrite";
+
+/** Refresh lead time — refresh when the current token has less than this left. */
+export const M365_REFRESH_LEAD_MS = 5 * 60 * 1000;
+
+type MinimalLog = {
+  info?: (tag: string, message: string) => void;
+  warn?: (tag: string, message: string) => void;
+};
+
+/** Decode a JWT payload WITHOUT verification — exp/tid are routing hints, never authz. */
+export function decodeJwtClaims(
+  token: string
+): { exp?: number; tid?: string; oid?: string } | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+    return payload && typeof payload === "object" ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
+/** True when the token is unreadable, already expired, or inside the refresh lead window. */
+export function tokenNeedsRefresh(token: string, leadMs = M365_REFRESH_LEAD_MS): boolean {
+  const claims = decodeJwtClaims(token);
+  if (!claims?.exp) return true;
+  return claims.exp * 1000 <= Date.now() + leadMs;
+}
+
+/** The freshest readable access token for a connection (JWT column → apiKey → psd). */
+export function currentM365AccessToken(
+  credentials: ProviderCredentials | undefined
+): string {
+  if (
+    typeof credentials?.accessToken === "string" &&
+    credentials.accessToken.split(".").length === 3
+  ) {
+    return credentials.accessToken;
+  }
+  if (typeof credentials?.apiKey === "string") {
+    const parsed = parsePastedCredential(credentials.apiKey);
+    if (parsed.accessToken && parsed.accessToken.split(".").length === 3) return parsed.accessToken;
+    // Opaque (JWE) individual-tier token — still a usable credential, just not refreshable.
+    return parsed.accessToken || "";
+  }
+  const psd = (credentials?.providerSpecificData ?? {}) as JsonRecord;
+  if (typeof psd.accessToken === "string") return psd.accessToken;
+  if (typeof psd.access_token === "string") return psd.access_token;
+  return "";
+}
+
+/** The chathub path (`<user-oid>@<tenant-id>`) from wherever it is stored. */
+export function currentM365ChathubPath(credentials: ProviderCredentials | undefined): string {
+  const psd = (credentials?.providerSpecificData ?? {}) as JsonRecord;
+  return (
+    (typeof credentials?.apiKey === "string"
+      ? parsePastedCredential(credentials.apiKey).chathubPath
+      : "") ||
+    (typeof psd.chathubPath === "string" && psd.chathubPath) ||
+    (typeof psd.userTenant === "string" && psd.userTenant) ||
+    ""
+  );
+}
+
+export interface M365RefreshResult {
+  accessToken: string;
+  refreshToken?: string;
+  expiresIn?: number;
+}
+
+/**
+ * Redeem the refresh_token (public client — no secret). MS may rotate the
+ * refresh_token; callers MUST persist the returned one when present or the
+ * token family dies after the first refresh.
+ */
+export async function refreshM365AccessToken(
+  refreshToken: string,
+  tid: string,
+  log?: MinimalLog
+): Promise<M365RefreshResult | { error: string }> {
+  const endpoint = `https://login.microsoftonline.com/${tid || "common"}/oauth2/v2.0/token`;
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json",
+      },
+      body: new URLSearchParams({
+        client_id: M365_OAUTH_CLIENT_ID,
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+        scope: M365_OAUTH_SCOPE,
+      }),
+    });
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok || typeof data.access_token !== "string") {
+      const error = typeof data.error === "string" ? data.error : `HTTP ${res.status}`;
+      log?.warn?.("M365_TOKEN", `refresh_token grant failed: ${error}`);
+      return { error };
+    }
+    log?.info?.("M365_TOKEN", "access token refreshed via refresh_token grant");
+    return {
+      accessToken: data.access_token,
+      refreshToken: typeof data.refresh_token === "string" ? data.refresh_token : undefined,
+      expiresIn: typeof data.expires_in === "number" ? data.expires_in : undefined,
+    };
+  } catch (e) {
+    const error = e instanceof Error ? e.message : String(e);
+    log?.warn?.("M365_TOKEN", `refresh request failed: ${error}`);
+    return { error };
+  }
 }
 
 /** Flatten OpenAI messages into a single prompt (system instructions prepended). */

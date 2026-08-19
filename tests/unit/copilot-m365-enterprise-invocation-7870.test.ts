@@ -29,12 +29,24 @@ class MockM365WebSocket {
 
   send(data: string): void {
     this.sent.push(String(data));
-    const parsed = JSON.parse(String(data).replace(/\x1e$/, ""));
-    if (parsed.protocol === "json") {
+    // #10718 — a single socket write may carry multiple \x1e-terminated frames
+    // (the chat invocation and its Metrics follow-up ride together).
+    const parsedFrames = String(data)
+      .split("\x1e")
+      .filter((f) => f.length > 0)
+      .map((f) => {
+        try {
+          return JSON.parse(f);
+        } catch {
+          return null;
+        }
+      });
+    const parsed = parsedFrames.find((f) => f && f.protocol === "json") ?? parsedFrames[0];
+    if (parsed?.protocol === "json") {
       queueMicrotask(() => this.emit("message", Buffer.from(encodeFrame({}))));
       return;
     }
-    if (parsed.type === 4 && parsed.target === "chat") {
+    if (parsedFrames.some((f) => f?.type === 4 && f?.target === "chat")) {
       queueMicrotask(() => {
         this.emit(
           "message",
@@ -83,7 +95,7 @@ async function sendChatInvocation(tier: string | undefined) {
     assert.equal(MockM365WebSocket.instances.length, 1);
     const sentFrames = MockM365WebSocket.instances[0].sent;
     const chatFrameRaw = sentFrames
-      .map((f) => f.replace(/\x1e$/, ""))
+      .flatMap((f) => f.split("\x1e").filter((frame) => frame.length > 0))
       .map((f) => {
         try {
           return JSON.parse(f);
@@ -132,31 +144,30 @@ test("#7870: enterprise-tier chat invocation defaults tone to Magic", async () =
   assert.equal(invocationArgs.tone, "Magic");
 });
 
-test("#7870: individual (no tier) chat invocation payload stays byte-identical to today", async () => {
+test("#10718: individual (no tier) chat invocation carries the recaptured 2026-08 shape", async () => {
   const invocationArgs = await sendChatInvocation(undefined);
   const optionsSets = invocationArgs.optionsSets as string[];
-  assert.ok(optionsSets.includes("enable_msa_user"));
-  assert.equal(invocationArgs.tone, "");
+  // The 25-entry consumer/MSA set (enable_msa_user, pdnascan, …) is gone from
+  // the wire — the stale set was part of the silently-dropped shape.
+  assert.ok(!optionsSets.includes("enable_msa_user"));
+  assert.ok(optionsSets.includes("enable_gg_gpt"));
+  // The browser sends tone:"magic" (lowercase) on the individual/EDU surface.
+  assert.equal(invocationArgs.tone, "magic");
   assert.deepEqual(invocationArgs.allowedMessageTypes, [
     "Chat",
     "Suggestion",
-    "InternalSearchQuery",
     "Disengaged",
-    "InternalLoaderMessage",
     "Progress",
-    "GeneratedCode",
-    "RenderCardRequest",
-    "AdsQuery",
-    "SemanticSerp",
-    "GenerateContentQuery",
+    "EndOfRequest",
+    "InternalLoaderMessage",
   ]);
 });
 
-test("#7870: EDU-tier chat invocation payload stays byte-identical to today (unaffected by enterprise change)", async () => {
+test("#10718: EDU-tier chat invocation carries the same recaptured shape", async () => {
   const invocationArgs = await sendChatInvocation("edu");
   const optionsSets = invocationArgs.optionsSets as string[];
-  assert.ok(optionsSets.includes("enable_msa_user"));
-  assert.equal(invocationArgs.tone, "");
+  assert.ok(!optionsSets.includes("enable_msa_user"));
+  assert.equal(invocationArgs.tone, "magic");
 });
 
 test("#8971: enterprise-tier chat invocation must send disconnectBehavior=continue", async () => {
@@ -168,11 +179,11 @@ test("#8971: enterprise-tier chat invocation must send disconnectBehavior=contin
   );
 });
 
-test("#8971: individual (no tier) chat invocation disconnectBehavior remains empty (byte-identical to #4042)", async () => {
+test("#8971/#10718: individual (no tier) chat invocation omits disconnectBehavior (not on the 2026-08 wire)", async () => {
   const invocationArgs = await sendChatInvocation(undefined);
   assert.equal(
     invocationArgs.disconnectBehavior,
-    "",
-    `individual-tier invocation must carry disconnectBehavior=""; got ${JSON.stringify(invocationArgs.disconnectBehavior)}`
+    undefined,
+    `individual-tier invocation must omit disconnectBehavior; got ${JSON.stringify(invocationArgs.disconnectBehavior)}`
   );
 });

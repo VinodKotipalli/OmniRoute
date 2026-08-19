@@ -11,7 +11,9 @@
  * Protocol (from @skyzea1's #4042 capture):
  *   - JSON messages terminated with the SignalR record separator `\x1e`.
  *   - Handshake: → {"protocol":"json","version":1}  ← {}  → {"type":6}
- *   - Send: type:4 invocation to target "chat" with arguments[0] = { message, ... }
+ *   - Send: type:4 invocation to target "chat" with arguments[0] = { message, ... },
+ *     immediately followed by a type:1 target:"Metrics" frame in the SAME socket
+ *     write (#10718 — an invocation without its Metrics pair is silently dropped).
  *   - Stream: type:1 target:"update" deltas (bot text at arguments[0].messages[].text,
  *     accumulated — NOT incremental) → isLastUpdate:true → type:2 final → type:3 completion.
  */
@@ -25,19 +27,18 @@ export const HANDSHAKE_REQUEST = { protocol: "json", version: 1 } as const;
 /** SignalR keepalive ping frame. */
 export const KEEPALIVE_PING = { type: 6 } as const;
 
-/** Allowed message types observed in the individual M365 send frame. */
+/**
+ * Allowed message types observed in the 2026-08 recapture of the working
+ * `m365.cloud.microsoft/chat` client (#10718). The old 11-entry list is no longer
+ * seen on the wire — the stale shape gets closed immediately after the type:4.
+ */
 export const ALLOWED_MESSAGE_TYPES = [
   "Chat",
   "Suggestion",
-  "InternalSearchQuery",
   "Disengaged",
-  "InternalLoaderMessage",
   "Progress",
-  "GeneratedCode",
-  "RenderCardRequest",
-  "AdsQuery",
-  "SemanticSerp",
-  "GenerateContentQuery",
+  "EndOfRequest",
+  "InternalLoaderMessage",
 ] as const;
 
 /**
@@ -74,22 +75,20 @@ export const M365_ENTERPRISE_EXTRA_MESSAGE_TYPES = [
   "SwitchRespondingEndpoint",
 ] as const;
 
+/**
+ * Individual / EDU option sets from the 2026-08 recapture (#10718) — 14 entries.
+ * The previous 25-entry consumer/MSA set (enable_msa_user, pdnascan, cwc_code_*,
+ * …) is no longer observed on the wire and belongs to the shape the substrate
+ * now drops silently.
+ */
 export const M365_DEFAULT_OPTION_SETS = [
   "search_result_progress_messages_with_search_queries",
   "update_textdoc_response_after_streaming",
   "deepleo_networking_timeout_10minutes_canmore",
   "cwc_flux_image",
-  "cwc_code_interpreter",
-  "cwc_code_interpreter_amsfix",
-  "enable_msa_user",
-  "cwcgptv",
+  "cwcfluxgptv",
   "flux_v3_gptv_enable_upload_multi_image_in_turn_wo_ch",
   "gptvnorm2048",
-  "pdnascan",
-  "cwc_code_interpreter_citation_fix",
-  "code_interpreter_interactive_charts",
-  "cwc_code_interpreter_interactive_charts_inline_image",
-  "code_interpreter_matplotlib_patching",
   "cwc_fileupload_odb",
   "update_memory_plugin",
   "add_custom_instructions",
@@ -97,9 +96,6 @@ export const M365_DEFAULT_OPTION_SETS = [
   "flux_v3_progress_messages",
   "enable_batch_token_processing",
   "enable_gg_gpt",
-  "flux_v3_image_gen_enable_non_watermarked_storage",
-  "flux_v3_image_gen_enable_story",
-  "rich_responses",
 ] as const;
 
 /** Append the record separator to a JSON-serializable frame. */
@@ -115,6 +111,32 @@ export function handshakeFrame(): string {
 /** Serialized keepalive ping frame. */
 export function keepaliveFrame(): string {
   return encodeFrame(KEEPALIVE_PING);
+}
+
+/**
+ * #10718 — the browser follows the type:4 chat invocation with this type:1
+ * target:"Metrics" frame in the SAME socket write. Sending the invocation alone
+ * gets it silently ignored (no update frames at all), so the executor must
+ * concatenate `metricsFrame()` onto the invocation payload.
+ */
+export const CHAT_METRICS_FRAME = {
+  arguments: [
+    {
+      Timestamps: {
+        ConnectionEstablished: "",
+        ConnectionStart: "",
+        UserInputStart: "",
+        UserInputSubmit: "",
+      },
+    },
+  ],
+  target: "Metrics",
+  type: 1,
+} as const;
+
+/** Serialized Metrics follow-up frame (see {@link CHAT_METRICS_FRAME}). */
+export function metricsFrame(): string {
+  return encodeFrame(CHAT_METRICS_FRAME);
 }
 
 /**
@@ -155,22 +177,37 @@ export function handshakeError(frame: Record<string, unknown> | null): string | 
 
 export interface ChatInvocationOptions {
   text: string;
-  /** Per-connection trace id (hex), reused as clientCorrelationId/traceId. */
+  /** Per-invocation trace id (GUID). */
   traceId: string;
-  /** Per-session id (GUID). */
+  /** Client correlation id; defaults to {@link ChatInvocationOptions.traceId}. */
+  clientCorrelationId?: string;
+  /** Per-session id (GUID, == the WS URL X-SessionId query). */
   sessionId: string;
+  /** Per-request id (== the WS URL chatsessionid/clientrequestid query). */
+  requestId: string;
+  /**
+   * Conversation id — MUST match the ConversationId query of the WS URL the
+   * invocation rides on (#10718: the server cross-checks the two).
+   */
+  conversationId: string;
+  /** BCP-47 locale echoed in message.locale; defaults to "en-us". */
+  locale?: string;
+  /** IANA time zone for message.locationInfo; defaults to "UTC". */
+  timeZone?: string;
+  /** Hour offset for message.locationInfo; defaults to 0. */
+  timeZoneOffset?: number;
   /** Whether this is the first turn of the conversation. */
   isStartOfSession?: boolean;
-  /** Tier-specific option flags; left empty by default (tuned during live validation). */
+  /** Tier-specific option flags; defaults to {@link M365_DEFAULT_OPTION_SETS}. */
   optionsSets?: string[];
   tone?: string;
   /** Tier-specific allowed message types; defaults to {@link ALLOWED_MESSAGE_TYPES}. */
   allowedMessageTypes?: readonly string[];
   /**
-   * Tier-specific disconnect behavior sent in every type:4 chat invocation. The work
-   * Surface rejects any value other than exactly "continue" (#8971). Defaults to ""
-   * for individual/consumer/EDU tiers; {@link resolveChatInvocationOverrides} returns
-   * "continue" for the enterprise tier.
+   * Tier-specific disconnect behavior sent in the type:4 chat invocation. The work
+   * surface rejects any value other than exactly "continue" (#8971), so the
+   * enterprise tier sends it; the 2026-08 recapture shows the individual/EDU
+   * surface omits the key entirely, so it is left out unless set (#10718).
    */
   disconnectBehavior?: string;
 }
@@ -185,7 +222,7 @@ export function resolveChatInvocationOverrides(tier: string | undefined): {
   optionsSets: string[];
   tone: string;
   allowedMessageTypes: readonly string[];
-  disconnectBehavior: string;
+  disconnectBehavior: string | undefined;
 } {
   if (tier === "enterprise") {
     return {
@@ -197,9 +234,12 @@ export function resolveChatInvocationOverrides(tier: string | undefined): {
   }
   return {
     optionsSets: [...M365_DEFAULT_OPTION_SETS],
-    tone: "",
+    // #10718 — the 2026-08 recapture sends tone:"magic" (lowercase) on the
+    // individual/EDU surface; the old "" default is part of the dropped shape.
+    tone: "magic",
     allowedMessageTypes: ALLOWED_MESSAGE_TYPES,
-    disconnectBehavior: "",
+    // Omitted entirely on the individual/EDU wire (see ChatInvocationOptions).
+    disconnectBehavior: undefined,
   };
 }
 
@@ -207,7 +247,7 @@ export function resolveChatInvocationOverrides(tier: string | undefined): {
  * BizChat exposes several models selected by the `tone` field of the `type:4` chat
  * invocation (#7872, values confirmed against a real enterprise tenant in #7850). Each
  * tone-selected variant is registered as its own model id; the bare `copilot-m365` id is
- * intentionally absent here so it keeps the tier default tone (`Magic` on enterprise, `""`
+ * intentionally absent here so it keeps the tier default tone (`Magic` on enterprise, `magic`
  * otherwise) resolved by {@link resolveChatInvocationOverrides}.
  */
 export const M365_MODEL_TONE_MAP: Readonly<Record<string, string>> = {
@@ -228,7 +268,14 @@ export function resolveToneForModel(model: string | undefined): string | undefin
 
 /**
  * Build the `type:4` chat invocation frame body (not yet `\x1e`-terminated).
- * Mirrors the argument shape captured on the individual M365 path in #4042.
+ * Mirrors the argument shape recaptured from a working `m365.cloud.microsoft/chat`
+ * client in 2026-08 (#10718). Notable differences from the pre-#10718 shape: a
+ * populated `clientInfo` + `productThreadType:"Office"`, a `conversationId`
+ * matching the WS URL query, a rich `message` object, and no
+ * `spokenTextMode` / `extraExtensionParameters` / `isSbsSupported` /
+ * `renderReferencesBehindEOS` / `disconnectBehavior` — none of those are still
+ * observed on the wire, and the stale shape gets closed immediately after the
+ * invocation.
  */
 export function buildChatInvocation(opts: ChatInvocationOptions): Record<string, unknown> {
   return {
@@ -237,33 +284,48 @@ export function buildChatInvocation(opts: ChatInvocationOptions): Record<string,
     invocationId: "0",
     arguments: [
       {
-        source: "officeweb",
-        clientCorrelationId: opts.traceId,
-        sessionId: opts.sessionId,
-        optionsSets: opts.optionsSets ?? [...M365_DEFAULT_OPTION_SETS],
-        streamingMode: "ConciseWithPadding",
-        spokenTextMode: "None",
-        options: {},
-        extraExtensionParameters: {},
         allowedMessageTypes: opts.allowedMessageTypes
           ? [...opts.allowedMessageTypes]
           : [...ALLOWED_MESSAGE_TYPES],
-        sliceIds: [],
-        threadLevelGptId: {},
-        traceId: opts.traceId,
-        isStartOfSession: opts.isStartOfSession ?? true,
-        clientInfo: {},
-        message: {
-          author: "user",
-          inputMethod: "Keyboard",
-          text: opts.text,
-          messageType: "Chat",
+        clientCorrelationId: opts.clientCorrelationId ?? opts.traceId,
+        clientInfo: {
+          clientAppName: "Office",
+          clientPlatform: "mcmcopilot-web",
         },
+        conversationId: opts.conversationId,
+        isStartOfSession: opts.isStartOfSession ?? true,
+        message: {
+          adaptiveCards: [],
+          attachments: null,
+          author: "user",
+          clientPreferences: {},
+          entityAnnotationTypes: ["People", "File", "Event", "Email", "TeamsMessage"],
+          experienceType: "Default",
+          inputMethod: "Keyboard",
+          locale: opts.locale ?? "en-us",
+          locationInfo: {
+            timeZone: opts.timeZone ?? "UTC",
+            timeZoneOffset: opts.timeZoneOffset ?? 0,
+          },
+          messageType: "Chat",
+          requestId: opts.requestId,
+          text: opts.text,
+        },
+        options: {},
+        optionsSets: opts.optionsSets ?? [...M365_DEFAULT_OPTION_SETS],
         plugins: [],
-        isSbsSupported: false,
-        tone: opts.tone ?? "",
-        renderReferencesBehindEOS: true,
-        disconnectBehavior: opts.disconnectBehavior ?? "",
+        productThreadType: "Office",
+        sessionId: opts.sessionId,
+        sliceIds: [],
+        source: "officeweb",
+        streamingMode: "ConciseWithPadding",
+        threadLevelGptId: {},
+        tone: opts.tone ?? "magic",
+        toolChoice: null,
+        traceId: opts.traceId,
+        // #8971 keeps "continue" for the enterprise tier; the individual/EDU wire
+        // omits the key, so only include it when actually set (#10718).
+        ...(opts.disconnectBehavior ? { disconnectBehavior: opts.disconnectBehavior } : {}),
       },
     ],
   };
