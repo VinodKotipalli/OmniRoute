@@ -65,6 +65,7 @@ type RunCombo = (options: HandleComboChatOptions) => Promise<Response>;
  * hand back to it when it dispatches a nested combo-ref.
  */
 type PreludeBaseOptionArgs = {
+  invocationId?: string;
   body: Record<string, unknown>;
   combo: ComboLike;
   handleSingleModel: HandleSingleModel;
@@ -103,6 +104,7 @@ function buildBaseOptions(a: PreludeBaseOptionArgs): HandleComboChatOptions {
     signal: a.signal,
     apiKeyAllowedConnections: a.apiKeyAllowedConnections,
     hiddenModelsByProvider: a.hiddenModelsByProvider,
+    invocationId: a.invocationId,
     clientManagedResponsesContext: a.clientManagedResponsesContext,
     perTargetAdmission: a.perTargetAdmission,
     deferContextOverflowWhenCompressible: a.deferContextOverflowWhenCompressible,
