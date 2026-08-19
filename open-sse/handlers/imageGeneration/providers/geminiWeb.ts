@@ -211,7 +211,7 @@ export async function handleGeminiWebImageGeneration({
           model,
           status: 502,
           startTime,
-          error: `Gemini Web generated an image but OmniRoute could not download it for b64_json conversion: ${sanitizeErrorMessage(err)}`,
+          error: `Gemini Web generated an image but OmniRoute could not download it for b64_json conversion: ${sanitizeErrorMessage(err instanceof Error ? err.message : String(err))}`,
           requestBody,
         });
       }

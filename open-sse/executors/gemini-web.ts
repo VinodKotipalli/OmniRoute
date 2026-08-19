@@ -34,8 +34,12 @@ const GEMINI_URL = "https://gemini.google.com/app";
  */
 export function isMissingBrowserExecutable(message: string): boolean {
   if (!message) return false;
-  return /executable doesn't exist|executablenotfound|playwright install|chromium.*download/i.test(
-    message
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("executable doesn't exist") ||
+    lower.includes("executablenotfound") ||
+    lower.includes("playwright install") ||
+    (lower.includes("chromium") && lower.includes("download"))
   );
 }
 const GEMINI_USER_AGENT =

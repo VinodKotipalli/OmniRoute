@@ -137,15 +137,18 @@ test("streaming event: ping only (no content, no terminator) → still valid (re
   assert.strictEqual(verdict.valid, true);
 });
 
-test("streaming OpenAI finish_reason-only chunk (no content delta) → valid (recognised terminator)", async () => {
-  // Some reasoning models emit a final `finish_reason: "stop"` chunk with
-  // no content and no follow-up `data: [DONE]`. That's a legitimate empty
-  // completion, not a truncation. Sending the `finish_reason` chunk
-  // WITHOUT a trailing `[DONE]` isolates the new finish_reason check —
-  // removing it would flip this test to invalid.
+test("streaming OpenAI finish_reason-only chunk (no content delta) → invalid (#10404 terminated-but-empty failover)", async () => {
+  // Some upstreams reach a terminal `finish_reason: "stop"` chunk while
+  // never emitting any content, reasoning, or tool_calls in any chunk —
+  // an upstream that burns the whole generation budget and returns
+  // completion_tokens:0 with an HTTP 200 (#10404). The stream is
+  // well-formed and properly terminated (not a #7285 truncation), but it
+  // carries zero usable output, so combo must fail over to a sibling
+  // target rather than forward the empty completion as a success.
   const res = makeSseResponse(
     'data: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n'
   );
   const verdict = await validateResponseQuality(res, true, {});
-  assert.strictEqual(verdict.valid, true);
+  assert.strictEqual(verdict.valid, false);
+  assert.match(verdict.reason ?? "", /streaming openai terminated with empty completion/);
 });

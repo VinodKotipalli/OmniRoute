@@ -2597,7 +2597,7 @@ test("chatCore injects progress events into streaming responses when requested",
   assert.equal(result.response.headers.get("X-OmniRoute-Progress"), "enabled");
   assert.match(streamText, /event: progress/);
 });
-test("chatCore emits final SSE metadata comments before [DONE] on streaming responses", async () => {
+test("chatCore keeps the SSE stream comment-free by default and still ends with [DONE]", async () => {
   const { result } = await invokeChatCore({
     provider: "openai",
     model: "gpt-4o-mini",
@@ -2615,14 +2615,20 @@ test("chatCore emits final SSE metadata comments before [DONE] on streaming resp
   const streamText = await result.response.text();
 
   assert.equal(result.success, true);
+  // The per-request metadata reaches the client through these headers regardless
+  // of the comment setting — that is what makes the trailer optional.
   assert.equal(result.response.headers.get("X-OmniRoute-Provider"), "openai");
   assert.equal(result.response.headers.get("X-OmniRoute-Model"), "gpt-4o-mini");
-  assert.match(streamText, /: x-omniroute-response-cost=\d+\.\d{10}/);
-  assert.match(streamText, /: x-omniroute-tokens-in=\d+/);
-  assert.match(streamText, /: x-omniroute-tokens-out=\d+/);
-  assert.ok(
-    streamText.indexOf(": x-omniroute-response-cost=") < streamText.indexOf("data: [DONE]")
-  );
+
+  // #10524 flipped OMNIROUTE_SSE_COMMENTS to off-by-default: strict SSE clients
+  // JSON.parse every line and crash on `: x-omniroute-*` comments. This test used
+  // to assert the opposite and went red on the release branch when that default
+  // landed. The opt-in half — trailer present, after the finish chunk and before
+  // [DONE] — is owned by sse-comments-optout-9305.test.ts, which drives the env
+  // var through all three states; enabling it here instead leaks process.env into
+  // the sibling call-log tests in this file.
+  assert.doesNotMatch(streamText, /: x-omniroute-/);
+  assert.match(streamText, /data: \[DONE\]/);
 });
 test("buildStreamingResponseHeaders drops upstream compression and framing headers", () => {
   const headers = new Headers(

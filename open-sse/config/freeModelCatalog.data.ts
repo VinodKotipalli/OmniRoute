@@ -361,7 +361,7 @@ export const FREE_MODEL_BUDGETS: FreeModelBudget[] = [
   { provider: "qoder", modelId: "deepseek-v4-pro", displayName: "DeepSeek-V4-Pro", monthlyTokens: 0, creditTokens: 1000000, freeType: "one-time-initial", poolKey: "qoder", tos: "caution" },
   { provider: "qoder", modelId: "deepseek-v4-flash", displayName: "DeepSeek-V4-Flash", monthlyTokens: 0, creditTokens: 1000000, freeType: "one-time-initial", poolKey: "qoder", tos: "caution" },
   { provider: "qoder", modelId: "minimax-m3", displayName: "MiniMax-M3", monthlyTokens: 0, creditTokens: 1000000, freeType: "one-time-initial", poolKey: "qoder", tos: "caution" },
-  { provider: "qwen-web", modelId: "qwen3.8-max-preview", displayName: "Qwen3.8 Max Preview", monthlyTokens: 0, creditTokens: 0, freeType: "keyless", poolKey: "qwen-web", tos: "avoid" },
+  { provider: "qwen-web", modelId: "qwen3.8-max", displayName: "Qwen3.8 Max", monthlyTokens: 0, creditTokens: 0, freeType: "keyless", poolKey: "qwen-web", tos: "avoid" },
   { provider: "qwen-web", modelId: "qwen3.7-max", displayName: "Qwen3.7 Max", monthlyTokens: 0, creditTokens: 0, freeType: "keyless", poolKey: "qwen-web", tos: "avoid" },
   { provider: "qwen-web", modelId: "qwen3.7-plus", displayName: "Qwen3.7 Plus", monthlyTokens: 0, creditTokens: 0, freeType: "keyless", poolKey: "qwen-web", tos: "avoid" },
   { provider: "qwen-web", modelId: "qwen3.6-plus", displayName: "Qwen3.6 Plus", monthlyTokens: 0, creditTokens: 0, freeType: "keyless", poolKey: "qwen-web", tos: "avoid" },

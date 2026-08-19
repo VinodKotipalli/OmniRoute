@@ -1343,18 +1343,24 @@ test("v1 models catalog returns 500 when model compatibility lookup crashes", as
 
   db.prepare = (sql) => {
     const statement = originalPrepare(sql);
-    if (String(sql) !== "SELECT value FROM key_value WHERE namespace = ? AND key = ?") {
+    // #9147: the catalog builder now resolves hidden models via a single bulk
+    // read (`getHiddenModelsByProvider()`, src/lib/db/models.ts) instead of the
+    // old per-provider `SELECT value FROM key_value WHERE namespace = ? AND
+    // key = ?` / readCompatList() lookup — intercept the bulk query's `.all()`
+    // call so this test still exercises "DB read for model visibility crashes
+    // -> catalog endpoint surfaces 500" against the current implementation.
+    if (
+      String(sql) !==
+      "SELECT namespace, key, value FROM key_value WHERE namespace IN ('modelCompatOverrides', 'customModels')"
+    ) {
       return statement;
     }
 
     return new Proxy(statement, {
       get(target, prop, receiver) {
-        if (prop === "get") {
+        if (prop === "all") {
           return (...args) => {
-            if (args[0] === "modelCompatOverrides") {
-              throw new Error("compat lookup boom");
-            }
-            return target.get(...args);
+            throw new Error("compat lookup boom");
           };
         }
         return Reflect.get(target, prop, receiver);

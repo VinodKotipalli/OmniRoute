@@ -7763,6 +7763,10 @@
       "terse-cjk": {
         "label": "CJK súc tích (文言)",
         "description": "Văn phong Hán cổ cực kỳ súc tích (chỉ khả dụng với tiếng Trung)."
+      },
+      "i-have-adhd": {
+        "label": "Tôi bị ADHD (ưu tiên hành động)",
+        "description": "Đầu ra ưu tiên hành động: nêu hành động kế tiếp trước, các bước được đánh số, một bước tiếp theo cụ thể, không mở đầu dài dòng."
       }
     },
     "resilienceWaitForCooldown": "Chờ thời gian hồi",
@@ -8195,7 +8199,11 @@
     "cliproxyapiHealth": "Sức Khỏe",
     "cliproxyapiPort": "Cổng",
     "qdrantHost": "Máy chủ",
-    "qdrantCollection": "Bộ Sưu Tập"
+    "qdrantCollection": "Bộ Sưu Tập",
+    "reasoningTokenBuffer": "Bộ đệm token suy luận",
+    "reasoningTokenBufferDesc": "Cho phép định tuyến combo thêm khoảng dư max_tokens chỉ với các mô hình suy luận đã biết, khi toàn bộ bộ đệm vẫn nằm trong giới hạn đầu ra đã biết.",
+    "zeroLatencyOptimizations": "Tối ưu hóa zero-latency",
+    "zeroLatencyOptimizationsDesc": "Bật hedging, bỏ qua TTFT theo dự đoán và nén dự phòng chủ động. Để tắt nếu bạn không muốn các tính năng độ trễ này chạy đua giữa các đích hoặc nén các yêu cầu dự phòng."
   },
   "contextRtk": {
     "title": "RTK Engine",

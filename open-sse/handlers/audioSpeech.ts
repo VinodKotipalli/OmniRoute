@@ -25,6 +25,7 @@ import { handleAwsPollySpeech } from "../executors/awsPollyTts.ts";
 import { handleEdgeTtsSpeech } from "../executors/edgeTts.ts";
 import { GttsUpstreamError, normalizeGttsLang, synthesizeGtts } from "../executors/gtts.ts";
 import { errorResponse } from "../utils/error.ts";
+import { resolveElevenLabsVoiceId } from "./elevenLabsVoiceMap.ts";
 import { audioStreamResponse, upstreamErrorResponse } from "../utils/audioResponse.ts";
 import {
   getKieCallbackUrl,
@@ -263,8 +264,20 @@ async function handleSonioxSpeech(providerConfig, body, modelId, token) {
  * voice_id is mapped from the OpenAI `voice` parameter
  */
 async function handleElevenLabsSpeech(providerConfig, body, modelId, token) {
-  // ElevenLabs uses voice_id in URL path; default to "21m00Tcm4TlvDq8ikWAM" (Rachel)
-  const voiceId = body.voice || "21m00Tcm4TlvDq8ikWAM";
+  // ElevenLabs uses voice_id in URL path. body.voice may be an OpenAI stock voice name
+  // (alloy, echo, ...), a known ElevenLabs display name (Rachel, ...), or a raw voice_id;
+  // resolve it to a real voice_id before it ever reaches the URL. Defaults to Rachel
+  // ("21m00Tcm4TlvDq8ikWAM") when omitted.
+  if (typeof body.voice === "string" && !isValidPathSegment(body.voice)) {
+    return errorResponse(400, "Invalid voice ID");
+  }
+  const voiceId = resolveElevenLabsVoiceId(body.voice);
+  if (!voiceId) {
+    return errorResponse(
+      400,
+      "Unknown ElevenLabs voice. Provide a real ElevenLabs voice_id, a supported OpenAI voice name (alloy, echo, fable, onyx, nova, shimmer), or a known ElevenLabs display name."
+    );
+  }
   if (!isValidPathSegment(voiceId)) {
     return errorResponse(400, "Invalid voice ID");
   }

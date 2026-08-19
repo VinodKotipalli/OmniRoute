@@ -7,6 +7,7 @@ import {
   isOpenAICompatibleProvider,
   isSelfHostedChatProvider,
   providerAllowsOptionalApiKey,
+  resolveProviderId,
   WEB_COOKIE_PROVIDERS,
 } from "@/shared/constants/providers";
 import { MODAL_DEFAULT_VALIDATION_MODEL_ID } from "@/shared/constants/modal";
@@ -107,6 +108,7 @@ import {
   validateBytezProvider,
 } from "./validation/webCookie";
 import { validateAiHordeProvider } from "./validation/aihorde";
+import { validateAdobeFireflyProvider } from "./validation/adobeFirefly";
 import {
   validateV0VercelProvider,
   validateAuggieProvider,
@@ -184,6 +186,11 @@ export async function validateProviderApiKey({ provider, apiKey, providerSpecifi
     devin: validateDevinCloudAgentProvider,
     auggie: validateAuggieProvider,
     aihorde: validateAiHordeProvider,
+    // #10522: registered under both the canonical id and the short alias — Firefly
+    // connections are commonly stored as "firefly" (same prefix as firefly/<model>
+    // routing ids), not the canonical "adobe-firefly" WEB_COOKIE_PROVIDERS key.
+    "adobe-firefly": validateAdobeFireflyProvider,
+    firefly: validateAdobeFireflyProvider,
     qoder: validateQoderProvider,
     kiro: validateKiroProvider,
     "command-code": validateCommandCodeProvider,
@@ -328,9 +335,14 @@ export async function validateProviderApiKey({ provider, apiKey, providerSpecifi
   // per-provider validator (grok-web, chatgpt-web, claude-web, …) are handled by
   // SPECIALTY_VALIDATORS first and must not be shadowed by this generic probe (issue: the
   // #4023 dispatch was placed too early and intercepted every web-cookie provider).
-  if (WEB_COOKIE_PROVIDERS[provider]) {
+  const canonicalProvider = resolveProviderId(provider);
+  if (WEB_COOKIE_PROVIDERS[canonicalProvider]) {
     try {
-      return await validateWebCookieProvider({ provider, apiKey, providerSpecificData });
+      return await validateWebCookieProvider({
+        provider: canonicalProvider,
+        apiKey,
+        providerSpecificData,
+      });
     } catch (error: any) {
       return toValidationErrorResult(error);
     }

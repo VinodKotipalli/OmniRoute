@@ -56,7 +56,10 @@ export interface SearchProviderCountRow {
 
 /**
  * Returns one row per provider with call-level aggregates plus last-status
- * subselects. Excludes rows where provider is NULL or '-'.
+ * subselects. Excludes rows where provider is NULL or '-', and excludes
+ * providers with no live row in `provider_connections` — a deleted provider
+ * connection must not keep surfacing as a ghost topology node forever from
+ * its retained historical call_logs rows. See #10714.
  */
 export function getProviderMetrics(): ProviderMetricRow[] {
   const db = getDbInstance();
@@ -96,6 +99,9 @@ export function getProviderMetrics(): ProviderMetricRow[] {
           ) as lastErrorStatus
         FROM call_logs c
         WHERE c.provider IS NOT NULL AND c.provider != '-'
+          AND EXISTS (
+            SELECT 1 FROM provider_connections pc WHERE pc.provider = c.provider
+          )
         GROUP BY c.provider`
     )
     .all() as ProviderMetricRow[];

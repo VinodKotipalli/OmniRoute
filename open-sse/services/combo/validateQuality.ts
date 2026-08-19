@@ -516,6 +516,24 @@ export async function validateResponseQuality(
             return { valid: false, reason: "streaming openai truncated without finish_reason" };
           }
 
+          // Issue #10404: an OpenAI-shape stream that DOES reach a terminal
+          // marker (finish_reason / [DONE]) but never carried any real
+          // content, reasoning, or tool_calls in any chunk — an upstream
+          // that burns the whole generation budget and returns
+          // completion_tokens:0 with an HTTP 200. `anyContentFound` only
+          // flips true via `isKnownNonClaudeStreamPayload` detecting
+          // content/reasoning/tool_calls (`hasOpenAICompatibleStreamValue`),
+          // so a tool_calls-only stream already exits early via the
+          // `outcome === "content"` branch above and never reaches here —
+          // this branch only fires on genuinely empty completions.
+          if (openAi.hasChoicePayload && openAi.hasTerminalMarker && !anyContentFound) {
+            log.warn?.(
+              "COMBO",
+              "Streaming OpenAI-shape response reached finish_reason/[DONE] with no content, reasoning, or tool_calls — marking as invalid for combo failover"
+            );
+            return { valid: false, reason: "streaming openai terminated with empty completion" };
+          }
+
           // Incomplete lifecycle or non-Claude stream — replay all buffered
           // bytes. The reader is exhausted so the forwarding reader will
           // immediately signal done.

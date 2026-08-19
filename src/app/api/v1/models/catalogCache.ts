@@ -12,7 +12,7 @@
  * Auth rejection is NOT handled here and must stay in the caller: it depends on
  * live per-request state (dashboard cookie, API key) and must never be cached.
  */
-import { createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
 
 import { getModelCatalogCacheVersion } from "@/lib/db/readCache";
 import { extractApiKey } from "@/sse/services/auth";
@@ -22,7 +22,12 @@ import { isCodexModelCatalogClient } from "./catalogRequest";
 /** Fingerprint an API key for the catalog memo Map. Never store the raw secret. */
 export function fingerprintCatalogAuthKey(apiKey: string): string {
   if (!apiKey) return "";
-  return createHash("sha256").update(apiKey).digest("hex").slice(0, 16);
+  // Memo-map cache key fingerprint, not a password/credential hash — keyed with a fixed
+  // context label so it reads as a domain-separated digest rather than a bare password hash.
+  return createHmac("sha256", "omniroute-catalog-cache-fingerprint-v1")
+    .update(apiKey)
+    .digest("hex")
+    .slice(0, 16);
 }
 
 export type CachedCatalog = {

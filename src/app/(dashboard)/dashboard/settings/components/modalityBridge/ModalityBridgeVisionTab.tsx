@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { Card, ModelSelectField, Toggle } from "@/shared/components";
+import type { ApiModel } from "@/shared/components/ModelSelectField";
 import {
   MODALITY_BRIDGE_DEFAULTS,
   resolveVisionBridgeRuntimeSettings,
@@ -55,6 +56,7 @@ function clampNumber(raw: string, min: number, max: number, fallback: number): n
 export default function ModalityBridgeVisionTab() {
   const t = useTranslations("settings");
   const [settings, setSettings] = useState<VisionState | null>(null);
+  const isVisionModel = useCallback((model: ApiModel) => model.supportsVision === true, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -174,6 +176,7 @@ export default function ModalityBridgeVisionTab() {
           allowEmpty
           onChange={(value) => void update({ modalityBridgeVisionModel: value })}
           className="text-sm"
+          modelFilter={isVisionModel}
         />
 
         <Toggle

@@ -80,10 +80,16 @@ function loadProvidersModule(): Promise<typeof import("@/lib/db/providers")> {
  * Returns `null` when the credential store is unavailable (unit tests / early boot).
  */
 export async function hasUsableCredentialsForModel(model: string): Promise<boolean | null> {
-  const provider = typeof model === "string" ? model.split("/")[0]?.trim() : "";
-  if (!provider) return null;
+  const rawPrefix = typeof model === "string" ? model.split("/")[0]?.trim() : "";
+  if (!rawPrefix) return null;
   try {
     const { getProviderConnections } = await loadProvidersModule();
+    // The model ids this module receives use the PUBLIC ALIAS (PROVIDER_MODELS keys,
+    // e.g. "cmd" for command-code), but provider_connections.provider is always
+    // persisted under the raw registry id — resolve the alias first, matching every
+    // other credential-check path (open-sse/services/model.ts, sse/services/auth.ts).
+    const { resolveProviderId } = await import("@/shared/constants/providers");
+    const provider = resolveProviderId(rawPrefix);
     const connections = await getProviderConnections({ provider, isActive: true });
     if (!Array.isArray(connections)) return null;
     // Empty active set is a definitive "no" only when the table is readable.

@@ -2069,7 +2069,8 @@ export default function APIPageClient({ machineId }: Readonly<APIPageClientProps
               iconBg="bg-teal-500/10"
               title={t("listModels")}
               path="/v1/models"
-              models={null}
+              models={allModels}
+              modelsLoading={modelsLoading}
               copy={copy}
               copied={copied}
               baseUrl={currentEndpoint}

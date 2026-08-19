@@ -567,9 +567,12 @@ function getContextOverride(
 /**
  * Resolve a persisted context override by canonical id, then by the exact raw
  * alias supplied by the caller. Neither lookup inherits to related models.
+ *
+ * `snapshot` is the #9147 build-local bulk load; when supplied the on-demand
+ * SQLite read is skipped and the preloaded nested map is used instead.
  */
-export function getResolvedModelContextOverride(input: CapabilityInput): number | null {
-  return getContextOverride(resolveCapabilityInput(input));
+export function getResolvedModelContextOverride(input: CapabilityInput, snapshot?: ModelCapabilityResolutionSnapshot | null): number | null {
+  return getContextOverride(resolveCapabilityInput(input), snapshot);
 }
 
 function getInputTokenCapabilityOverride(resolved: {

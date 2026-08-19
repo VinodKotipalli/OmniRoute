@@ -144,6 +144,9 @@ describe("auto/<family> materialization (#6453)", () => {
     // `zcode` joined for the same documented reason too — #10184 added the local
     // ZCode app-server backend whose registry (registry/zcode) advertises the
     // full GLM_SHARED_MODELS line-up, so it genuinely serves the family.
+    // `cloudflare-playground` joined on the same rule — its registry
+    // (open-sse/config/providers/registry/cloudflare-playground/index.ts) advertises
+    // zai-org/glm-5.2 and zai-org/glm-4.7-flash, so it genuinely serves the family.
     assert.deepEqual(providerIds, [
       "auggie",
       "cloudflare-playground",

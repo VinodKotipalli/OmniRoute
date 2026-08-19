@@ -140,6 +140,18 @@ ENV OMNIROUTE_USE_TURBOPACK="${OMNIROUTE_USE_TURBOPACK}"
 ARG OMNIROUTE_BASE_PATH=""
 ENV OMNIROUTE_BASE_PATH=$OMNIROUTE_BASE_PATH
 
+# #10273: the dashboard's `frame-ancestors` policy is compiled into the route
+# manifest by next.config.mjs (via scripts/build/dashboardEmbed.mjs), so it is
+# fixed when the image is built and cannot be flipped with `-e` on a running
+# container. Build with `--build-arg DASHBOARD_ALLOW_EMBED=vscode` to produce an
+# image whose HTML pages may be framed by the VS Code Simple Browser
+# (OmniCopilot's `dashboardOpen: "editor"`). Unset — the default — keeps every
+# route on `frame-ancestors 'none'` + X-Frame-Options: DENY. Builder-stage only:
+# the runner stage deliberately does not carry it, because a runtime value would
+# suggest an effect it cannot have.
+ARG DASHBOARD_ALLOW_EMBED=""
+ENV DASHBOARD_ALLOW_EMBED=$DASHBOARD_ALLOW_EMBED
+
 # Docker containers cannot run the MITM/Agent-Bridge stack (no host DNS/cert
 # access), so keep @/mitm/manager on the graceful stub (#3390). This flag is
 # Docker-only: npm/Electron/VPS builds must bundle the REAL manager (#6344).

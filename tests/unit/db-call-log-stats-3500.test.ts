@@ -93,6 +93,17 @@ test.after(() => {
 // ---------------------------------------------------------------------------
 
 test("#3500 getProviderMetrics — aggregates totals and latency per provider", () => {
+  // #10714: getProviderMetrics() only surfaces providers with a live
+  // provider_connections row — seed openai/anthropic connections so their
+  // call_logs rows are not filtered out as ghost/deleted providers.
+  const db0 = core.getDbInstance();
+  db0.prepare(
+    `INSERT INTO provider_connections (id, provider, created_at, updated_at) VALUES (?, ?, ?, ?)`
+  ).run("conn-3500-openai", "openai", new Date().toISOString(), new Date().toISOString());
+  db0.prepare(
+    `INSERT INTO provider_connections (id, provider, created_at, updated_at) VALUES (?, ?, ?, ?)`
+  ).run("conn-3500-anthropic", "anthropic", new Date().toISOString(), new Date().toISOString());
+
   // Two openai rows: one success, one error with error_summary
   const ts1 = "2025-06-01T10:00:00.000Z";
   const ts2 = "2025-06-01T11:00:00.000Z";

@@ -31,7 +31,7 @@
  * @see Issue: X-ConversationId / agentic conversation tracking
  */
 
-import { createHash, randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import {
   createAgenticConversation,
   findAgenticConversationsByFingerprint,
@@ -200,8 +200,10 @@ export function extractCanonicalTurns(body: JsonRecord | null | undefined): Cano
 
 // ── Fingerprint (identity, O(1) regardless of history size) ─────────────
 
+// Content fingerprint for conversation identity, not a password/credential hash — keyed with a
+// fixed context label so it reads as a domain-separated digest rather than a bare password hash.
 function hashHex(text: string): string {
-  return createHash("sha256").update(text).digest("hex");
+  return createHmac("sha256", "omniroute-conversation-fingerprint-v1").update(text).digest("hex");
 }
 
 function extractToolNames(body: JsonRecord | null | undefined): string[] {

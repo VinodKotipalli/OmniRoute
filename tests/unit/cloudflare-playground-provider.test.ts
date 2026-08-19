@@ -127,7 +127,8 @@ test("cloudflare-playground is present in NOAUTH_PROVIDERS (noAuth category)", (
   assert.equal(p.hasFree, true);
   assert.ok(typeof p.freeNote === "string" && (p.freeNote as string).length > 0);
   assert.ok(typeof p.authHint === "string" && (p.authHint as string).length > 0);
-  assert.ok(typeof p.website === "string" && (p.website as string).includes("cloudflare.com"));
+  assert.ok(typeof p.website === "string");
+  assert.ok(new URL(p.website as string).hostname.endsWith(".cloudflare.com"));
 });
 
 test("cloudflare-playground registry entry has no-auth shape and curated models", () => {

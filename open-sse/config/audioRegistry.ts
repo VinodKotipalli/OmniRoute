@@ -7,6 +7,8 @@
  * - /v1/audio/speech (TTS API)
  */
 
+import { getProviderAlias } from "@/shared/constants/providers";
+
 interface AudioModel {
   id: string;
   name: string;
@@ -674,6 +676,16 @@ function parseAudioModel(
   for (const [providerId] of Object.entries(registry)) {
     if (modelStr.startsWith(providerId + "/")) {
       return { provider: providerId, model: modelStr.slice(providerId.length + 1) };
+    }
+  }
+
+  // Phase 1.5: prefix match against the short provider alias the catalog itself
+  // advertises (e.g. "el/eleven_multilingual_v2" for elevenlabs) when it differs
+  // from the canonical registry key already tried in Phase 1.
+  for (const [providerId] of Object.entries(registry)) {
+    const alias = getProviderAlias(providerId);
+    if (alias && alias !== providerId && modelStr.startsWith(alias + "/")) {
+      return { provider: providerId, model: modelStr.slice(alias.length + 1) };
     }
   }
 

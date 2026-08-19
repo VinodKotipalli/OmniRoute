@@ -17,8 +17,11 @@ function getPublicModel(id: string) {
   return ANTIGRAVITY_PUBLIC_MODELS.find((model) => model.id === id) as any;
 }
 
+// #10537 retired the single-alias `gemini-3.7-flash` (which mapped to the upstream
+// `gemini-3.7-flash-tiered`) in favor of three directly-callable tiered public models —
+// the suffixed ids now work upstream without the collapsing alias. Keep this list in sync
+// with ANTIGRAVITY_PUBLIC_MODELS/ANTIGRAVITY_MODEL_ALIASES instead of the retired bare id.
 const EXPECTED_FLASH_TIERS = [
-  ["gemini-3.7-flash", "Gemini 3.7 Flash"],
   ["gemini-3.7-flash-high", "Gemini 3.7 Flash (High)"],
   ["gemini-3.7-flash-medium", "Gemini 3.7 Flash (Medium)"],
   ["gemini-3.7-flash-low", "Gemini 3.7 Flash (Low)"],
