@@ -72,9 +72,17 @@ let fetchCallCount = 0;
 
 function installFakeOpenRouterFetch(): void {
   fetchCallCount = 0;
-  globalThis.fetch = (async () => {
-    fetchCallCount++;
-    return new Response(JSON.stringify({ data: [{ id: "test/fake-model", architecture: {} }] }), {
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url =
+      typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+    if (url.includes("openrouter.ai")) {
+      fetchCallCount++;
+      return new Response(JSON.stringify({ data: [{ id: "test/fake-model", architecture: {} }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify({ data: [] }), {
       status: 200,
       headers: { "content-type": "application/json" },
     });
@@ -83,9 +91,17 @@ function installFakeOpenRouterFetch(): void {
 
 function installFailingOpenRouterFetch(): void {
   fetchCallCount = 0;
-  globalThis.fetch = (async () => {
-    fetchCallCount++;
-    throw new Error("simulated OpenRouter network failure");
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url =
+      typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+    if (url.includes("openrouter.ai")) {
+      fetchCallCount++;
+      throw new Error("simulated OpenRouter network failure");
+    }
+    return new Response(JSON.stringify({ data: [] }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
   }) as typeof fetch;
 }
 
