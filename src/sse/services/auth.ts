@@ -61,6 +61,10 @@ import {
 } from "@omniroute/open-sse/services/quotaPreflight.ts";
 import { resolveResilienceSettings } from "@/lib/resilience/settings";
 import { resolveModelLockoutSettings } from "@/lib/resilience/modelLockoutSettings";
+import {
+  buildMixedAvailabilityError,
+  isTransportCooldownErrorCode,
+} from "../services/sameAccountTransportRetry";
 import { syncHealthFromDB, type KeyHealth } from "@omniroute/open-sse/services/apiKeyRotator.ts";
 import {
   classifyProviderError,
@@ -1049,7 +1053,9 @@ async function getProviderSearchPool(provider: string): Promise<string[]> {
       if (!nodeId) continue;
       if (
         nodePrefix &&
-        (nodePrefix === provider || nodePrefix === canonicalProvider || nodePrefix === canonicalAlias)
+        (nodePrefix === provider ||
+          nodePrefix === canonicalProvider ||
+          nodePrefix === canonicalAlias)
       ) {
         searchPool.add(nodeId);
       }
@@ -1686,6 +1692,32 @@ export async function getProviderCredentials(
     }
 
     if (policyEligibleConnections.length === 0 && availableConnections.length > 0) {
+      const transportUnavailable = connections.filter(
+        (connection) =>
+          connectionFilterStatus.get(connection.id) === "rateLimited" &&
+          isTransportCooldownErrorCode(connection.errorCode)
+      );
+      if (transportUnavailable.length > 0) {
+        const mixed = buildMixedAvailabilityError({
+          provider,
+          quotaFilteredCount: blockedByPolicy.length,
+          transportUnavailableCount: transportUnavailable.length,
+          transportStatus: Number(transportUnavailable[0]?.errorCode) || 503,
+        });
+        const retryAfter =
+          getEarliestFutureDate(
+            transportUnavailable.map((connection) => connection.rateLimitedUntil || null)
+          ) || new Date(Date.now() + 3000).toISOString();
+        invalidateManagedLease(options, "HEALTH_OR_COOLDOWN");
+        return {
+          allRateLimited: true,
+          retryAfter,
+          retryAfterHuman: formatRetryAfter(retryAfter),
+          lastError: mixed.lastError,
+          lastErrorCode: mixed.lastErrorCode,
+        };
+      }
+
       const earliestResetAt = getEarliestFutureDate(blockedByPolicy.map((entry) => entry.resetAt));
       const earliestResetMs = parseFutureDateMs(earliestResetAt);
 
