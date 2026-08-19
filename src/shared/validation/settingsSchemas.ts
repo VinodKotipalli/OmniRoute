@@ -174,6 +174,10 @@ export const updateSettingsSchema = z.object({
     )
     .optional(),
   customBannedSignals: z.array(z.string().max(200)).optional(),
+  // #9817: opt-in (default off) — lets a probe-origin (model test-all)
+  // failure deactivate a connection like real traffic. Off by default:
+  // probe failures are recorded but never mutate routing state.
+  probeCanDisable: z.boolean().optional(),
   debugMode: z.boolean().optional(),
   logToolSources: z.boolean().optional(),
   hiddenSidebarItems: z.array(z.enum(HIDEABLE_SIDEBAR_ITEM_IDS)).optional(),

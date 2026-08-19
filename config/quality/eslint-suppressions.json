@@ -1023,11 +1023,6 @@
       "count": 1
     }
   },
-  "src/lib/api/modelTestRunner.ts": {
-    "no-restricted-imports": {
-      "count": 1
-    }
-  },
   "src/lib/api/proxyRegistryRouteHandlers.ts": {
     "no-restricted-imports": {
       "count": 1
