@@ -462,3 +462,44 @@ test("v1 search POST auto-select uses authless SearXNG when no API-key providers
     globalThis.fetch = originalFetch;
   }
 });
+
+test("v1 search POST 502 includes the provider id and sanitized cause", async () => {
+  await seedConnection("serper-search", { apiKey: "test-key" });
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async () => {
+    const err = new TypeError("fetch failed");
+    (err as Error & { cause?: { code: string; address: string } }).cause = {
+      code: "ENETUNREACH",
+      address: "203.0.113.10",
+    };
+    throw err;
+  };
+
+  try {
+    const response = await searchRoute.POST(
+      new Request("http://localhost/api/v1/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: "named provider 502",
+          provider: "serper-search",
+          search_type: "web",
+        }),
+      })
+    );
+    const body = (await response.json()) as {
+      error?: { provider?: string; message?: string };
+    };
+
+    assert.equal(response.status, 502);
+    assert.equal(body.error?.provider, "serper-search");
+    assert.equal(
+      body.error?.message,
+      "Search provider serper-search error: fetch failed (cause: ENETUNREACH)"
+    );
+    assert.equal(JSON.stringify(body).includes("203.0.113"), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

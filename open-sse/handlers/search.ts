@@ -27,6 +27,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { z } from "zod";
 import { sanitizeErrorMessage } from "../utils/error.ts";
+import { formatSearchProviderFailure } from "./search/providerFailure.ts";
 
 export interface SearchResult {
   title: string;
@@ -1147,11 +1148,7 @@ async function tryZaiMCPProvider(
       /* non-critical — logging must not block search response */
     });
 
-    return {
-      success: false,
-      status: isTimeout ? 504 : 502,
-      error: `Search provider ${isTimeout ? "timeout" : "error"}: ${sanitizeErrorMessage(err.message)}`,
-    };
+    return formatSearchProviderFailure(config.id, err, isTimeout);
   }
 }
 
@@ -1526,10 +1523,6 @@ async function tryProvider(
       /* non-critical — logging must not block search response */
     });
 
-    return {
-      success: false,
-      status: isTimeout ? 504 : 502,
-      error: `Search provider ${isTimeout ? "timeout" : "error"}: ${sanitizeErrorMessage(err.message)}`,
-    };
+    return formatSearchProviderFailure(config.id, err, isTimeout);
   }
 }

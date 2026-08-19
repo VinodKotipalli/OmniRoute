@@ -303,7 +303,11 @@ async function postHandler(request: Request, context: unknown) {
       });
 
       if (!result.success) {
-        throw new SearchError(result.error || "Search failed", result.status || 502);
+        throw new SearchError(
+          result.error || "Search failed",
+          result.status || 502,
+          providerConfig.id
+        );
       }
 
       return result.data!;
@@ -331,7 +335,12 @@ async function postHandler(request: Request, context: unknown) {
     });
   } catch (err: any) {
     if (err instanceof SearchError) {
-      const errorPayload = toJsonErrorPayload(err.message, "Search provider error");
+      const errorPayload = toJsonErrorPayload(err.message, "Search provider error") as {
+        error?: Record<string, unknown>;
+      };
+      if (err.providerId && errorPayload?.error && typeof errorPayload.error === "object") {
+        errorPayload.error.provider = err.providerId;
+      }
       return new Response(JSON.stringify(errorPayload), {
         status: err.statusCode,
         headers: { "Content-Type": "application/json", ...CORS_HEADERS },
@@ -349,9 +358,11 @@ async function postHandler(request: Request, context: unknown) {
 
 class SearchError extends Error {
   statusCode: number;
-  constructor(message: string, statusCode: number) {
+  providerId?: string;
+  constructor(message: string, statusCode: number, providerId?: string) {
     super(message);
     this.statusCode = statusCode;
+    this.providerId = providerId;
   }
 }
 
