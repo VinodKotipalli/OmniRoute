@@ -7760,6 +7760,10 @@
         "label": "Ponytail (lazy senior dev)",
         "description": "Lazy senior-dev discipline: climb the YAGNI ladder, fix root cause, smallest working diff."
       },
+      "i-have-adhd": {
+        "label": "Tenho TDAH (ação em primeiro lugar)",
+        "description": "Saída com foco em ação: próxima ação em destaque, etapas numeradas, um passo concreto, sem preâmbulo."
+      },
       "terse-cjk": {
         "label": "CJK conciso (文言)",
         "description": "Estilo ultra-conciso em chinês clássico (disponível apenas para chinês)."
@@ -8044,6 +8048,10 @@
     "credentialRedactionDesc": "Redija chaves de API, tokens e segredos do contexto enviado para provedores e das respostas.",
     "enableCredentialRedaction": "Ativar a ocultação de credenciais",
     "enableCredentialRedactionDesc": "Remove as chaves da API, tokens, chaves privadas e JWTs de mensagens, chamadas de ferramentas e respostas.",
+    "reasoningTokenBuffer": "Buffer de tokens de raciocínio",
+    "reasoningTokenBufferDesc": "Permite que o roteamento combo adicione margem max_tokens apenas para modelos de raciocínio conhecidos quando o buffer couber no limite de saída.",
+    "zeroLatencyOptimizations": "Otimizações de latência zero",
+    "zeroLatencyOptimizationsDesc": "Ativa proteção (hedging), ignorar TTFT preditivo e compressão preventiva de fallback. Deixe desativado para evitar que esses recursos disputem alvos ou comprimam solicitações de fallback.",
     "pricingAutoSyncDisabled": "Sincronização automática desativada",
     "pricingAutoSyncEnabled": "Sincronização automática ativada",
     "modalityBridgeIntro": "Converta conteúdo multimodal em texto antes que ele chegue a modelos apenas de texto. As pontes de visão, áudio e vídeo estão disponíveis e podem ser configuradas.",
