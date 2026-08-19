@@ -11,6 +11,13 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+type JsonResponse = {
+  object?: string;
+  model?: string;
+  choices?: Array<{ message: { role: string; content: string } }>;
+  error?: { message: string };
+};
+
 test("GitlabExecutor is registered in the executor index", () => {
   assert.equal(hasSpecializedExecutor("gitlab"), true);
   assert.ok(getExecutor("gitlab") instanceof GitlabExecutor);
@@ -72,7 +79,7 @@ test("GitlabExecutor posts PAT-backed code suggestion requests to the configured
     assert.match(String(calls[0].body.user_instruction), /Write a hello world function/);
     assert.match(String(calls[0].body.current_file.content_above_cursor), /System instructions:/);
 
-    const body = (await result.response.json()) as any;
+    const body = (await result.response.json()) as JsonResponse;
     assert.equal(body.object, "chat.completion");
     assert.equal(body.choices[0].message.role, "assistant");
     assert.match(body.choices[0].message.content, /hello/);
@@ -131,7 +138,7 @@ test("GitlabExecutor maps upstream auth failures to OpenAI-style errors", async 
     });
 
     assert.equal(result.response.status, 403);
-    const body = (await result.response.json()) as any;
+    const body = (await result.response.json()) as JsonResponse;
     assert.match(body.error.message, /auth failed/i);
   } finally {
     globalThis.fetch = originalFetch;
@@ -206,7 +213,7 @@ test("GitlabExecutor uses GitLab direct_access for gitlab-duo and persists the c
       "direct-token"
     );
 
-    const body = (await result.response.json()) as any;
+    const body = (await result.response.json()) as JsonResponse;
     assert.equal(body.model, "GitLab Duo Claude Sonnet");
     assert.match(body.choices[0].message.content, /gitlab duo/i);
   } finally {
@@ -254,7 +261,7 @@ test("GitlabExecutor falls back to the public Code Suggestions endpoint when dir
       "https://gitlab.example.com/api/v4/code_suggestions/completions",
     ]);
 
-    const body = (await result.response.json()) as any;
+    const body = (await result.response.json()) as JsonResponse;
     assert.equal(body.model, "code-gecko");
     assert.match(body.choices[0].message.content, /fallback path/i);
   } finally {
@@ -305,7 +312,7 @@ test("GitlabExecutor falls back to the public Code Suggestions endpoint when dir
       "https://gitlab.example.com/api/v4/code_suggestions/completions",
     ]);
 
-    const body = (await result.response.json()) as any;
+    const body = (await result.response.json()) as JsonResponse;
     assert.equal(body.model, "code-gecko");
     assert.match(body.choices[0].message.content, /monolith fallback works/i);
   } finally {

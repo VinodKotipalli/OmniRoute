@@ -1896,11 +1896,6 @@
       "count": 19
     }
   },
-  "tests/unit/cli-oauth-commands.test.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 18
-    }
-  },
   "tests/unit/cli-oneproxy-commands.test.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 22
@@ -2394,11 +2389,6 @@
   "tests/unit/executor-github.test.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 7
-    }
-  },
-  "tests/unit/executor-gitlab.test.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 4
     }
   },
   "tests/unit/executor-nlpcloud.test.ts": {

@@ -20,6 +20,7 @@
 import { GeminiWebExecutor } from "../../../executors/gemini-web.ts";
 import { fetchRemoteImage } from "@/shared/network/remoteImageFetch";
 import { saveImageErrorResult, saveImageSuccessResult } from "../../imageGeneration.ts";
+import { sanitizeErrorMessage } from "../../../utils/error.ts";
 
 /** Each image is one gemini.google.com turn (~30-60s). Cap like chatgpt-web. */
 const GEMINI_WEB_IMAGE_N_MAX = 4;
@@ -210,7 +211,7 @@ export async function handleGeminiWebImageGeneration({
           model,
           status: 502,
           startTime,
-          error: `Gemini Web generated an image but OmniRoute could not download it for b64_json conversion: ${err instanceof Error ? err.message : String(err)}`,
+          error: `Gemini Web generated an image but OmniRoute could not download it for b64_json conversion: ${sanitizeErrorMessage(err)}`,
           requestBody,
         });
       }
