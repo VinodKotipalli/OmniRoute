@@ -706,6 +706,7 @@ test("createSSEStream passthrough forwards data only after the complete SSE even
     {
       mode: "passthrough",
       sourceFormat: FORMATS.OPENAI,
+      clientResponseFormat: FORMATS.OPENAI_RESPONSES,
       provider: "openai",
       model: "responses-model",
       body: {
@@ -747,8 +748,13 @@ test("createSSEStream passthrough preserves event metadata in a single SSE event
     }
   );
 
-  assert.match(text, /^: upstream-note\nid: 42\ntrace: upstream-abc\ndata: /);
-  assert.doesNotMatch(text, /^: upstream-note\n\nid: 42/s);
+  // #10017 drops `:` comments, `id:` and `retry:` for every client format — none of
+  // the OpenAI Chat-Completions, OpenAI Responses or Claude Messages protocols define
+  // them. What this case still pins is the framing: the surviving lines stay inside ONE
+  // event instead of being split apart by blank lines.
+  assert.match(text, /^trace: upstream-abc\ndata: /);
+  assert.doesNotMatch(text, /: upstream-note/);
+  assert.doesNotMatch(text, /\bid: 42\b/);
   assert.doesNotMatch(text, /\ntrace: upstream-abc\n\n/s);
   assert.match(text, /metadata content/);
 });
