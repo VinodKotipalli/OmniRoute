@@ -781,6 +781,14 @@ function startNextServer() {
       ...serverEnv,
       DATA_DIR: dataDir,
       PORT: String(serverPort),
+      // Pin the embedded server to loopback. Next.js standalone binds to
+      // `process.env.HOSTNAME || '0.0.0.0'`, and Windows always exports
+      // HOSTNAME as the machine name — which resolves to the LAN address, so
+      // the server listens only there and 127.0.0.1 stays closed. The renderer
+      // then fails to load `http://localhost:<port>`, "ready-to-show" never
+      // fires, and the window (created with `show: false`) is never shown.
+      // Mirrors scripts/dev/run-next-playwright.mjs, which already pins this.
+      HOSTNAME: "127.0.0.1",
       NODE_ENV: "production",
       ELECTRON_RUN_AS_NODE: "1",
       NODE_PATH: resolveServerNodePath(serverEnv, resolvePackNodePaths(dataDir)),
