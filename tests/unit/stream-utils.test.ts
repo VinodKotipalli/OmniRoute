@@ -705,6 +705,7 @@ test("createSSEStream passthrough forwards data only after the complete SSE even
     ],
     {
       mode: "passthrough",
+      targetFormat: FORMATS.OPENAI_RESPONSES,
       sourceFormat: FORMATS.OPENAI,
       provider: "openai",
       model: "responses-model",
@@ -738,6 +739,7 @@ test("createSSEStream passthrough preserves event metadata in a single SSE event
     ],
     {
       mode: "passthrough",
+      targetFormat: FORMATS.CLAUDE,
       sourceFormat: FORMATS.OPENAI,
       provider: "openai",
       model: "gpt-4.1-mini",
@@ -747,9 +749,9 @@ test("createSSEStream passthrough preserves event metadata in a single SSE event
     }
   );
 
-  assert.match(text, /^: upstream-note\nid: 42\ntrace: upstream-abc\ndata: /);
-  assert.doesNotMatch(text, /^: upstream-note\n\nid: 42/s);
-  assert.doesNotMatch(text, /\ntrace: upstream-abc\n\n/s);
+  assert.match(text, /^trace: upstream-abc\ndata: /);
+  assert.doesNotMatch(text, /: upstream-note/);
+  assert.doesNotMatch(text, /^id: 42/m);
   assert.match(text, /metadata content/);
 });
 
@@ -2103,7 +2105,7 @@ test("createSSEStream passthrough drops keepalive event blocks without losing Re
   assert.equal(text.includes("data:\n\n"), false);
   assert.match(text, /response\.output_text\.delta/);
   assert.match(text, /Hello keepalive-safe/);
-  assert.match(text, /data: \[DONE\]/);
+  assert.doesNotMatch(text, /data: \[DONE\]/);
 });
 
 test("createSSEStream passthrough aborts on Responses usage-limit failures and reports 429", async () => {

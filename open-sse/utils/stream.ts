@@ -577,7 +577,10 @@ function getOpenAIIntermediateChunks(value: unknown): unknown[] {
   return Array.isArray(candidate) ? candidate : [];
 }
 
-export function restoreClaudePassthroughToolUseName(parsed: JsonRecord, toolNameMap: unknown): boolean {
+export function restoreClaudePassthroughToolUseName(
+  parsed: JsonRecord,
+  toolNameMap: unknown
+): boolean {
   const block =
     parsed.content_block && typeof parsed.content_block === "object"
       ? (parsed.content_block as JsonRecord)
@@ -660,13 +663,17 @@ export function createSSEStream(options: StreamOptions = {}) {
     performance.clearMarks("omni-request-body-size");
   }
 
+  const effectiveClientResponseFormat =
+    clientResponseFormat ??
+    (mode === STREAM_MODE.PASSTHROUGH ? (targetFormat ?? sourceFormat) : targetFormat);
+
   // Drop internal commentary-phase Responses output before forwarding (#6199).
   // Explicit option wins; otherwise read the feature flag (default on) — resolved once per stream.
   const shouldDropResponsesCommentary =
     dropResponsesCommentary ?? isFeatureFlagEnabled("RESPONSES_PASSTHROUGH_DROP_COMMENTARY");
   const clientExpectsResponsesStream =
     (mode === STREAM_MODE.PASSTHROUGH
-      ? clientResponseFormat === FORMATS.OPENAI_RESPONSES
+      ? effectiveClientResponseFormat === FORMATS.OPENAI_RESPONSES
       : sourceFormat === FORMATS.OPENAI_RESPONSES) === true;
 
   // Clients whose SSE protocol terminates naturally on the last
@@ -677,7 +684,7 @@ export function createSSEStream(options: StreamOptions = {}) {
   // state). Skip the `[DONE]` for these formats.
   const clientExpectsClaudeStream =
     (mode === STREAM_MODE.PASSTHROUGH
-      ? clientResponseFormat === FORMATS.CLAUDE
+      ? effectiveClientResponseFormat === FORMATS.CLAUDE
       : sourceFormat === FORMATS.CLAUDE) === true;
 
   // Antigravity/cloudcode streams terminate naturally on their last
@@ -687,7 +694,7 @@ export function createSSEStream(options: StreamOptions = {}) {
   // Go binary's protobuf deserializer receives `[DONE]` as input.
   const clientExpectsAntigravityStream =
     (mode === STREAM_MODE.PASSTHROUGH
-      ? clientResponseFormat === FORMATS.ANTIGRAVITY
+      ? effectiveClientResponseFormat === FORMATS.ANTIGRAVITY
       : sourceFormat === FORMATS.ANTIGRAVITY) === true;
 
   // Single source of truth for the [DONE] decision, used at both emission
@@ -837,7 +844,8 @@ export function createSSEStream(options: StreamOptions = {}) {
   // (#10017).
   const passthroughEventPrefix = createSSEEventPrefixBuffer({
     forwardEvent:
-      clientResponseFormat === FORMATS.OPENAI_RESPONSES || clientResponseFormat === FORMATS.CLAUDE,
+      effectiveClientResponseFormat === FORMATS.OPENAI_RESPONSES ||
+      effectiveClientResponseFormat === FORMATS.CLAUDE,
   });
   const multilineSseDataLineNormalizer = createSSEDataLineNormalizer();
 
@@ -1385,7 +1393,21 @@ export function createSSEStream(options: StreamOptions = {}) {
                   // Responses SSE: only extract usage, forward payload as-is
                   const extracted = extractUsage(parsed);
                   if (extracted) {
-                    usage = extracted;
+                    if (!usage) {
+                      usage = extracted;
+                    } else {
+                      const su = usage as Record<string, number>;
+                      const eu = extracted as Record<string, number>;
+                      if (eu.prompt_tokens > 0) su.prompt_tokens = eu.prompt_tokens;
+                      if (eu.completion_tokens > 0) su.completion_tokens = eu.completion_tokens;
+                      if (eu.total_tokens > 0) su.total_tokens = eu.total_tokens;
+                      if (eu.input_tokens > 0) su.input_tokens = eu.input_tokens;
+                      if (eu.output_tokens > 0) su.output_tokens = eu.output_tokens;
+                      if (eu.cache_read_input_tokens > 0)
+                        su.cache_read_input_tokens = eu.cache_read_input_tokens;
+                      if (eu.cache_creation_input_tokens > 0)
+                        su.cache_creation_input_tokens = eu.cache_creation_input_tokens;
+                    }
                   }
                   // Keep generic Responses deltas for fallback usage estimates,
                   // but only visible text deltas may become assistant content in
@@ -1682,6 +1704,7 @@ export function createSSEStream(options: StreamOptions = {}) {
                         !parsed.choices[0]?.finish_reason))
                   ) {
                     const emptyChoicesUsage = extractUsage(parsed) ?? parsed.usage;
+                    console.log("DEBUG LINE 1703:", { emptyChoicesUsage, usage });
                     if (hasValidUsage(emptyChoicesUsage)) {
                       // Some upstreams (e.g. Ollama Cloud) emit prompt_tokens: 0
                       // even when input was sent — they simply don't count input
@@ -1693,14 +1716,21 @@ export function createSSEStream(options: StreamOptions = {}) {
                         !Array.isArray(emptyChoicesUsage) &&
                         emptyChoicesUsage.completion_tokens > 0
                       ) {
-                        const pt = emptyChoicesUsage.prompt_tokens ?? 0;
-                        if (pt === 0) {
+                        const pt =
+                          (usage as Record<string, number> | null)?.prompt_tokens ??
+                          (emptyChoicesUsage as Record<string, unknown>).prompt_tokens;
+                        if (typeof pt !== "number" || pt === 0) {
                           const estimated = estimateUsage(body, totalContentLength, FORMATS.OPENAI);
                           if (estimated?.prompt_tokens > 0) {
-                            emptyChoicesUsage.prompt_tokens = estimated.prompt_tokens;
-                            emptyChoicesUsage.total_tokens =
-                              (emptyChoicesUsage.total_tokens ?? 0) + estimated.prompt_tokens;
+                            (emptyChoicesUsage as Record<string, unknown>).prompt_tokens =
+                              estimated.prompt_tokens;
+                            (emptyChoicesUsage as Record<string, unknown>).total_tokens =
+                              (Number(
+                                (emptyChoicesUsage as Record<string, unknown>).total_tokens
+                              ) || 0) + estimated.prompt_tokens;
                           }
+                        } else {
+                          (emptyChoicesUsage as Record<string, unknown>).prompt_tokens = pt;
                         }
                       }
                       usage = emptyChoicesUsage;
@@ -1880,7 +1910,21 @@ export function createSSEStream(options: StreamOptions = {}) {
 
                   const extracted = extractUsage(parsed);
                   if (extracted) {
-                    usage = extracted;
+                    if (!usage) {
+                      usage = extracted;
+                    } else {
+                      const su = usage as Record<string, number>;
+                      const eu = extracted as Record<string, number>;
+                      if (eu.prompt_tokens > 0) su.prompt_tokens = eu.prompt_tokens;
+                      if (eu.completion_tokens > 0) su.completion_tokens = eu.completion_tokens;
+                      if (eu.total_tokens > 0) su.total_tokens = eu.total_tokens;
+                      if (eu.input_tokens > 0) su.input_tokens = eu.input_tokens;
+                      if (eu.output_tokens > 0) su.output_tokens = eu.output_tokens;
+                      if (eu.cache_read_input_tokens > 0)
+                        su.cache_read_input_tokens = eu.cache_read_input_tokens;
+                      if (eu.cache_creation_input_tokens > 0)
+                        su.cache_creation_input_tokens = eu.cache_creation_input_tokens;
+                    }
                   }
 
                   const isFinishChunk = parsed.choices?.[0]?.finish_reason;
@@ -1909,11 +1953,7 @@ export function createSSEStream(options: StreamOptions = {}) {
                       injectedUsage = true;
                     }
                   }
-                  if (
-                    isFinishChunk &&
-                    !hasValidUsage(parsed.usage) &&
-                    !expectsOpenAIUsageOnlyChunk
-                  ) {
+                  if (isFinishChunk && !hasValidUsage(usage) && !expectsOpenAIUsageOnlyChunk) {
                     const estimated = estimateUsage(body, totalContentLength, FORMATS.OPENAI);
                     parsed.usage = filterUsageForFormat(estimated, FORMATS.OPENAI);
                     output = `data: ${JSON.stringify(parsed)}\n\n`;
