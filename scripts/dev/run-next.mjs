@@ -15,6 +15,7 @@ import { ensureNativeSqlite } from "./ensure-native-sqlite.mjs";
 import { isTurbopackCacheCorruption, purgeAllTurbopackCaches } from "./turbopackCacheHeal.mjs";
 import { randomUUID } from "node:crypto";
 import { getMainServerTimeoutConfig } from "./main-server-timeouts.mjs";
+import { createSystemdNotifier } from "./systemd-notify.mjs";
 
 const { maybeHandleDisallowedMethod } = methodGuard;
 const { wrapRequestListenerWithHeadResponseGuard } = headResponseGuard;
@@ -59,6 +60,13 @@ for (const [key, value] of Object.entries(mergedEnv)) {
     process.env[key] = value;
   }
 }
+
+// systemd sd_notify (Type=notify / WatchdogSec=): this process owns the
+// watchdog pings — if its event loop blocks (freeze), the pings stop and
+// systemd kills the service. No-op outside systemd (no NOTIFY_SOCKET).
+// Created AFTER .env is merged so the OMNIROUTE_DISABLE_SD_NOTIFY opt-out
+// documented in .env is honored on this path too.
+const systemdNotifier = createSystemdNotifier();
 
 // The mergedEnv copy above pulls NODE_ENV straight from `.env` — and the shipped
 // `.env.example` default is `NODE_ENV=production`. Next's programmatic `next()`
@@ -184,6 +192,7 @@ async function start() {
   });
 
   const shutdown = async (signal) => {
+    systemdNotifier.stopping();
     try {
       await new Promise((resolve) => server.close(resolve));
       await nextApp.close();
@@ -202,6 +211,8 @@ async function start() {
     console.log(
       `[Next] ${mode} server listening on http://${hostname}:${dashboardPort} (${bundler})`
     );
+    systemdNotifier.ready();
+    systemdNotifier.startWatchdog();
   });
 }
 

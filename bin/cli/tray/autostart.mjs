@@ -121,7 +121,16 @@ function writeLinuxSystemdUnit(cliPath) {
     "Wants=network-online.target",
     "",
     "[Service]",
-    "Type=simple",
+    // Type=notify + WatchdogSec: the server sends READY=1 once listening and
+    // WATCHDOG=1 every 60s; if its event loop ever blocks (frozen process),
+    // the pings stop and systemd kills+restarts the service. NotifyAccess=all
+    // because the pings come from the server child, not the serve supervisor.
+    // Foreground serve only: `--daemon` escapes the cgroup and would break
+    // the notify handshake.
+    "Type=notify",
+    "NotifyAccess=all",
+    "WatchdogSec=180",
+    "TimeoutStartSec=300",
     `ExecStart=${buildServeExecLine(cliPath, { tray: false })}`,
     "Restart=on-failure",
     "RestartSec=5",

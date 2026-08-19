@@ -49,6 +49,9 @@ export const APP_STAGING_ALLOWED_EXACT_PATHS: string[] = [
   "package.json",
   "peer-stamp.mjs",
   "main-server-timeouts.mjs",
+  // server-ws.mjs import (sd_notify helper) — enforced by the closure test
+  // tests/unit/pack-artifact-server-ws-closure.test.ts.
+  "systemd-notify.mjs",
   "responses-ws-proxy.mjs",
   "bin/chatgpt-web-codex-mcp.mjs",
   "scripts/dev/sync-env.mjs",
@@ -184,6 +187,8 @@ export const PACK_ARTIFACT_REQUIRED_PATHS: string[] = [
   "dist/responses-ws-proxy.mjs",
   "dist/peer-stamp.mjs",
   "dist/main-server-timeouts.mjs",
+  // server-ws.mjs import (sd_notify helper) — enforced by the closure test.
+  "dist/systemd-notify.mjs",
   "dist/http-method-guard.cjs",
   // #5452: regression guard — make check:pack-artifact fail loudly if the TLS
   // opt-in sidecar (imported by dist/server-ws.mjs) ever vanishes from the tarball.

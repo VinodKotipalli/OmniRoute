@@ -184,6 +184,11 @@ const EXTRA_MODULE_ENTRIES = [
     dest: ["main-server-timeouts.mjs"],
   },
   {
+    label: "systemd sd_notify helper (server-ws.mjs dependency)",
+    src: ["scripts", "dev", "systemd-notify.mjs"],
+    dest: ["systemd-notify.mjs"],
+  },
+  {
     label: "HTTP method guard (server-ws.mjs dependency)",
     src: ["scripts", "dev", "http-method-guard.cjs"],
     dest: ["http-method-guard.cjs"],
