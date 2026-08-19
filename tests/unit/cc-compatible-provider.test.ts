@@ -1182,36 +1182,52 @@ test("provider-nodes validate route reports unexpected upstream failures", async
 });
 
 test("provider-nodes list route exposes CC flag state from server env", async () => {
+  const previousEnv = process.env.ENABLE_CC_COMPATIBLE_PROVIDER;
   process.env.ENABLE_CC_COMPATIBLE_PROVIDER = "true";
+  try {
+    const response = await providerNodesRoute.GET();
+    assert.equal(response.status, 200);
 
-  const response = await providerNodesRoute.GET();
-  assert.equal(response.status, 200);
-
-  const data = (await response.json()) as any;
-  assert.equal(data.ccCompatibleProviderEnabled, true);
+    const data = (await response.json()) as any;
+    assert.equal(data.ccCompatibleProviderEnabled, true);
+  } finally {
+    if (previousEnv === undefined) {
+      delete process.env.ENABLE_CC_COMPATIBLE_PROVIDER;
+    } else {
+      process.env.ENABLE_CC_COMPATIBLE_PROVIDER = previousEnv;
+    }
+  }
 });
 
 test("provider models route reports CC compatible providers do not support models listing", async () => {
+  const previousEnv = process.env.ENABLE_CC_COMPATIBLE_PROVIDER;
   process.env.ENABLE_CC_COMPATIBLE_PROVIDER = "true";
+  try {
+    const connection = await providersDb.createProviderConnection({
+      provider: "anthropic-compatible-cc-test",
+      authType: "apikey",
+      name: "cc-live",
+      apiKey: "sk-test",
+      providerSpecificData: {
+        baseUrl: "https://proxy.example.com",
+        chatPath: CLAUDE_CODE_COMPATIBLE_DEFAULT_CHAT_PATH,
+      },
+    });
 
-  const connection = await providersDb.createProviderConnection({
-    provider: "anthropic-compatible-cc-test",
-    authType: "apikey",
-    name: "cc-live",
-    apiKey: "sk-test",
-    providerSpecificData: {
-      baseUrl: "https://proxy.example.com",
-      chatPath: CLAUDE_CODE_COMPATIBLE_DEFAULT_CHAT_PATH,
-    },
-  });
+    const response = await providerModelsRoute.GET(
+      new Request(`http://localhost/api/providers/${connection.id}/models`),
+      { params: { id: connection.id } }
+    );
 
-  const response = await providerModelsRoute.GET(
-    new Request(`http://localhost/api/providers/${connection.id}/models`),
-    { params: { id: connection.id } }
-  );
-
-  assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), {
-    error: "Provider anthropic-compatible-cc-test does not support models listing",
-  });
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), {
+      error: "Provider anthropic-compatible-cc-test does not support models listing",
+    });
+  } finally {
+    if (previousEnv === undefined) {
+      delete process.env.ENABLE_CC_COMPATIBLE_PROVIDER;
+    } else {
+      process.env.ENABLE_CC_COMPATIBLE_PROVIDER = previousEnv;
+    }
+  }
 });

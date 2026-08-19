@@ -2968,7 +2968,18 @@ export async function handleChatCore({
               ? (extractSessionAffinityKey(body, clientRawRequest?.headers) ?? null)
               : null;
 
-          while (attempts < maxAttempts) {
+          // ── Antigravity BYOP 422 account-rotation state ─────────────────────
+          // A GCP_PROJECT_REQUIRED 422 is account-specific (that Google
+          // account lacks a GCP Project ID). Rotate to a sibling antigravity
+          // account instead of surfacing the error, so multi-account setups
+          // keep working without user action. Tracked separately from
+          // maxAttempts so non-BYOP antigravity failures never get a second
+          // shot (no double upstream calls).
+          const antigravityByopExcludedIds: string[] = [];
+          let antigravityByopRotationPending = false;
+
+          while (attempts < maxAttempts || antigravityByopRotationPending) {
+            antigravityByopRotationPending = false; // consumed per iteration
             trace("pre_executor", { attempt: attempts });
             updatePendingScope(pendingScope, {
               stage: "sending_to_provider",
@@ -3193,6 +3204,55 @@ export async function handleChatCore({
                 releaseAccountSemaphore();
                 attempts++;
                 continue;
+              }
+
+              // ── Antigravity BYOP 422 account rotation ───────────────────────
+              // GCP_PROJECT_REQUIRED (422, code gcp_project_required) means
+              // THIS Google account must Bring Its Own GCP Project. Mark the
+              // connection excluded (rateLimitedUntil, best-effort) and rotate
+              // to a sibling antigravity account so the request succeeds
+              // without user action. When no sibling exists (or all are BYOP),
+              // fall through: the error-state block excludes the connection
+              // and the actionable 422 is surfaced.
+              if (provider === "antigravity" && res.response.status === 422) {
+                const byopBody = await res.response
+                  .clone()
+                  .text()
+                  .catch(() => "");
+                if (byopBody.includes("gcp_project_required")) {
+                  const byopFailedId =
+                    executionConnectionId || credentials?.connectionId || connectionId;
+                  if (byopFailedId) {
+                    if (!antigravityByopExcludedIds.includes(String(byopFailedId))) {
+                      antigravityByopExcludedIds.push(String(byopFailedId));
+                    }
+                    try {
+                      const { setConnectionRateLimitUntil } = await import("@/lib/db/providers");
+                      setConnectionRateLimitUntil(
+                        String(byopFailedId),
+                        Date.now() + COOLDOWN_MS.gcpProjectRequired
+                      );
+                    } catch {
+                      // best-effort — never break the rotation path
+                    }
+                  }
+                  const byopNextCreds = await getProviderCredentials(
+                    "antigravity",
+                    null,
+                    null,
+                    modelToCall || model || requestedModel || null,
+                    { excludeConnectionIds: [...antigravityByopExcludedIds] }
+                  ).catch(() => null);
+                  if (byopNextCreds && !byopNextCreds.allRateLimited) {
+                    log?.warn?.(
+                      "ANTIGRAVITY_BYOP_ROTATION",
+                      `BYOP 422 on connection ${String(byopFailedId).slice(0, 8)} → rotating to ${String(byopNextCreds.connectionId).slice(0, 8)}`
+                    );
+                    Object.assign(credentials, byopNextCreds);
+                    antigravityByopRotationPending = true;
+                    continue;
+                  }
+                }
               }
 
               // For streaming: release the semaphore when the client drains or cancels the stream.
@@ -4120,6 +4180,27 @@ export async function handleChatCore({
           });
           console.warn(
             `[provider] Node ${errorConnectionId} project routing error (${statusCode}) — not banning`
+          );
+        } else if (errorType === PROVIDER_ERROR_TYPES.GCP_PROJECT_REQUIRED) {
+          // Antigravity BYOP: the account must Bring Its Own GCP Project.
+          // Account-specific and fixable by entering a Project ID — never a
+          // model lockout, never a ban. Exclude the connection for the
+          // cooldown window so selection prefers sibling accounts; the 422
+          // body carries the actionable message when no sibling is available.
+          const byopCooldownMs = COOLDOWN_MS.gcpProjectRequired ?? 24 * 60 * 60 * 1000;
+          await updateProviderConnection(errorConnectionId, {
+            lastErrorType: errorType,
+            lastError: message,
+            errorCode: statusCode,
+          });
+          try {
+            const { setConnectionRateLimitUntil } = await import("@/lib/db/providers");
+            setConnectionRateLimitUntil(errorConnectionId, Date.now() + byopCooldownMs);
+          } catch {
+            // best-effort — never break the error path
+          }
+          console.warn(
+            `[provider] Node ${errorConnectionId} GCP project required (${statusCode}) — excluded for ${Math.ceil(byopCooldownMs / 1000)}s, routing to other accounts (enter a Project ID to restore)`
           );
         } else if (errorType === PROVIDER_ERROR_TYPES.GEO_BLOCKED) {
           // Google regional-availability refusal (e.g. "User location is not

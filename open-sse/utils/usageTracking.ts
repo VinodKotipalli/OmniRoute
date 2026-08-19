@@ -490,9 +490,14 @@ export function sanitizeProviderUsageForRequest(
   // by a relay provider. Only treat 0 as plausible when the request body itself is
   // trivial (no serialized body, or a body too small to plausibly need any tokens);
   // otherwise fall through to the same local-estimate repair used for over-reports.
+  const isDeltaOnlyUsage =
+    (usage.output_tokens !== undefined || usage.completion_tokens !== undefined) &&
+    usage.input_tokens === undefined &&
+    usage.prompt_tokens === undefined;
   const bodyBytesForZeroCheck = reportedInput === 0 ? getSerializedBodyBytes(body) : null;
   const zeroIsPlausible =
-    reportedInput === 0 && (bodyBytesForZeroCheck === null || bodyBytesForZeroCheck === 0);
+    isDeltaOnlyUsage ||
+    (reportedInput === 0 && (bodyBytesForZeroCheck === null || bodyBytesForZeroCheck === 0));
   if (zeroIsPlausible || (reportedInput > 0 && isInputTokenCountPlausible(reportedInput, body))) {
     return usage;
   }

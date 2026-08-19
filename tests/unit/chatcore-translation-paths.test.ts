@@ -2464,78 +2464,83 @@ test("chatCore records Claude prompt cache and cache usage metadata in call logs
   await settingsDb.updateSettings({ alwaysPreserveClientCache: "always" });
   invalidateCacheControlSettingsCache();
 
-  const { result } = await invokeChatCore({
-    provider: "claude",
-    model: "claude-sonnet-4-6",
-    endpoint: "/v1/messages",
-    credentials: { apiKey: "claude-key", providerSpecificData: {} },
-    requestHeaders: { "anthropic-beta": "prompt-caching-2024-07-31" },
-    userAgent: "Claude-Code/1.0.0",
-    responseFormat: "claude",
-    body: {
+  try {
+    const { result } = await invokeChatCore({
+      provider: "claude",
       model: "claude-sonnet-4-6",
-      max_tokens: 64,
-      system: [{ type: "text", text: "system", cache_control: { type: "ephemeral", ttl: "5m" } }],
-      messages: [
-        {
-          role: "user",
-          content: [{ type: "text", text: "question", cache_control: { type: "ephemeral" } }],
-        },
-        {
-          role: "assistant",
-          content: [
-            { type: "text", text: "answer", cache_control: { type: "ephemeral", ttl: "10m" } },
-          ],
-        },
-      ],
-      tools: [
-        {
-          name: "lookup_weather",
-          description: "Fetch weather",
-          input_schema: { type: "object" },
-          cache_control: { type: "ephemeral", ttl: "30m" },
-        },
-      ],
-    },
-    responseFactory() {
-      return new Response(
-        JSON.stringify({
-          id: "msg_json",
-          type: "message",
-          role: "assistant",
-          model: "claude-sonnet-4-6",
-          content: [{ type: "text", text: "cached answer" }],
-          stop_reason: "end_turn",
-          usage: {
-            input_tokens: 12,
-            output_tokens: 3,
-            cache_read_input_tokens: 4,
-            cache_creation_input_tokens: 2,
+      endpoint: "/v1/messages",
+      credentials: { apiKey: "claude-key", providerSpecificData: {} },
+      requestHeaders: { "anthropic-beta": "prompt-caching-2024-07-31" },
+      userAgent: "Claude-Code/1.0.0",
+      responseFormat: "claude",
+      body: {
+        model: "claude-sonnet-4-6",
+        max_tokens: 64,
+        system: [{ type: "text", text: "system", cache_control: { type: "ephemeral", ttl: "5m" } }],
+        messages: [
+          {
+            role: "user",
+            content: [{ type: "text", text: "question", cache_control: { type: "ephemeral" } }],
           },
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    },
-  });
+          {
+            role: "assistant",
+            content: [
+              { type: "text", text: "answer", cache_control: { type: "ephemeral", ttl: "10m" } },
+            ],
+          },
+        ],
+        tools: [
+          {
+            name: "lookup_weather",
+            description: "Fetch weather",
+            input_schema: { type: "object" },
+            cache_control: { type: "ephemeral", ttl: "30m" },
+          },
+        ],
+      },
+      responseFactory() {
+        return new Response(
+          JSON.stringify({
+            id: "msg_json",
+            type: "message",
+            role: "assistant",
+            model: "claude-sonnet-4-6",
+            content: [{ type: "text", text: "cached answer" }],
+            stop_reason: "end_turn",
+            usage: {
+              input_tokens: 12,
+              output_tokens: 3,
+              cache_read_input_tokens: 4,
+              cache_creation_input_tokens: 2,
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      },
+    });
 
-  const detail = await waitFor(() => getLatestCallLog());
+    const detail = await waitFor(() => getLatestCallLog());
 
-  assert.equal(result.success, true);
-  assert.ok(detail);
-  assert.equal(detail.requestBody._omniroute.claudePromptCache.applied, true);
-  // Breakpoints: system[2] (1), message content (1), assistant response (1). Tools cache_control is stripped by base.ts.
-  assert.equal(detail.requestBody._omniroute.claudePromptCache.totalBreakpoints, 3);
-  assert.equal(detail.responseBody._omniroute.claudePromptCache.applied, true);
-  assert.equal(detail.responseBody._omniroute.claudePromptCache.totalBreakpoints, 3);
-  assert.equal(typeof detail.responseBody._omniroute.claudePromptCache.anthropicBeta, "string");
-  assert.match(detail.responseBody._omniroute.claudePromptCache.anthropicBeta, /prompt-caching/i);
-  assert.deepEqual(detail.responseBody._omniroute.claudePromptCacheUsage, {
-    cacheReadTokens: 4,
-    cacheCreationTokens: 2,
-  });
+    assert.equal(result.success, true);
+    assert.ok(detail);
+    assert.equal(detail.requestBody._omniroute.claudePromptCache.applied, true);
+    // Breakpoints: system[2] (1), message content (1), assistant response (1). Tools cache_control is stripped by base.ts.
+    assert.equal(detail.requestBody._omniroute.claudePromptCache.totalBreakpoints, 3);
+    assert.equal(detail.responseBody._omniroute.claudePromptCache.applied, true);
+    assert.equal(detail.responseBody._omniroute.claudePromptCache.totalBreakpoints, 3);
+    assert.equal(typeof detail.responseBody._omniroute.claudePromptCache.anthropicBeta, "string");
+    assert.match(detail.responseBody._omniroute.claudePromptCache.anthropicBeta, /prompt-caching/i);
+    assert.deepEqual(detail.responseBody._omniroute.claudePromptCacheUsage, {
+      cacheReadTokens: 4,
+      cacheCreationTokens: 2,
+    });
+  } finally {
+    await settingsDb.updateSettings({ alwaysPreserveClientCache: "off" });
+    invalidateCacheControlSettingsCache();
+  }
 });
 test("chatCore propagates budget errors without an executor-level emergency hop", async () => {
   // The emergency budget fallback is orchestrated by the routing layer

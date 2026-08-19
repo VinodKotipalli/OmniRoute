@@ -122,6 +122,10 @@ const IGNORE_FROM_CODE = new Set([
   // ("http://192.168.0.15:20128" / null), never OmniRoute runtime config (#5151).
   "COMBO_LIVE_BASE_URL",
   "COMBO_LIVE_API_KEY",
+  // Ad-hoc mesh scripts (scripts/ad-hoc/mesh-run.mjs, mesh-send.mjs, verify-coverage.mjs) —
+  // CLI input parameters for Discord/mesh operations, not OmniRoute runtime config.
+  "BOT_URL",
+  "BOT_TOKEN",
   // Homologation E2E suite (npm run homolog) vars — configured via the dedicated
   // .env.homolog file (template: .env.homolog.example), never in the runtime .env.
   // Test/ops-only signals against the homologation VPS, same class as COMBO_LIVE_*.

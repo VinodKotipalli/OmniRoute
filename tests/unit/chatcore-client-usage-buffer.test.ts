@@ -67,7 +67,7 @@ test("all-zero usage stub → estimate (not constant buffer-only 2000)", () => {
     usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
     choices: [{ message: { content: "PONG" } }],
   };
-  applyClientUsageBuffer(resp, { messages: [{ role: "user", content: "hi" }] }, "openai", {}, deps);
+  applyClientUsageBuffer(resp, null, "openai", {}, deps);
   assert.equal(calls.buffer.length, 0, "must not buffer zeros into USAGE_TOKEN_BUFFER");
   assert.equal(calls.estimate.length, 1);
   assert.equal((resp.usage as Record<string, unknown>)._estimated, true);

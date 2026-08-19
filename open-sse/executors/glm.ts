@@ -20,7 +20,7 @@ import {
 } from "../config/glmProvider.ts";
 import { applyProviderRequestDefaults } from "../services/providerRequestDefaults.ts";
 import { stripUnsupportedParams } from "../translator/paramSupport.ts";
-import { getRotatingApiKey } from "../services/apiKeyRotator.ts";
+import { getRotatingApiKey, type KeyHealth } from "../services/apiKeyRotator.ts";
 import { CLAUDE_CLI_STAINLESS_PACKAGE_VERSION } from "../config/anthropicHeaders.ts";
 import {
   getRuntimeVersion,
@@ -244,8 +244,14 @@ export class GlmExecutor extends DefaultExecutor {
     stream = true,
     _clientHeaders?: Record<string, string> | null,
     _model?: string,
-    transport: GlmTransport = getGlmTransport(credentials.providerSpecificData)
+    healthOrTransport?: Record<string, KeyHealth> | GlmTransport,
+    _body?: unknown,
+    transportOverride?: GlmTransport
   ): Record<string, string> {
+    const transport =
+      typeof healthOrTransport === "string"
+        ? healthOrTransport
+        : (transportOverride ?? getGlmTransport(credentials.providerSpecificData));
     if (transport === "openai") {
       return buildGlmCodingHeaders(getEffectiveKey(credentials), stream);
     }
@@ -446,7 +452,12 @@ export class GlmExecutor extends DefaultExecutor {
    */
   private async finalizeAnthropicTransportResult(
     input: ExecuteInput,
-    result: { response: Response; url: string; headers: Record<string, string>; transformedBody: unknown }
+    result: {
+      response: Response;
+      url: string;
+      headers: Record<string, string>;
+      transformedBody: unknown;
+    }
   ): Promise<GlmExecuteResult> {
     const { response: rawResponse, url, headers, transformedBody } = result;
     const clientHeaders = input.clientHeaders ?? {};

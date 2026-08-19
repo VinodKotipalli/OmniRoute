@@ -1,52 +1,30 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const CONNECTIONS = [
-  {
-    id: "conn1",
-    provider: "gemini",
-    name: "My Gemini",
-    authType: "oauth",
-    isActive: true,
-    testStatus: "ok",
-  },
-  {
-    id: "conn2",
-    provider: "copilot",
-    name: "Copilot",
-    authType: "oauth2",
-    isActive: true,
-    testStatus: "ok",
-  },
-  {
-    id: "conn3",
-    provider: "openai",
-    name: "OpenAI Key",
-    authType: "api_key",
-    isActive: true,
-    testStatus: "ok",
-  },
+type Connection = {
+  id: string;
+  provider: string;
+  authType: string;
+};
+
+const CONNECTIONS: Connection[] = [
+  { id: "conn1", provider: "gemini", authType: "oauth" },
+  { id: "conn2", provider: "cursor", authType: "oauth2" },
+  { id: "conn3", provider: "openai", authType: "api_key" },
 ];
 
 function makeResp(data: unknown, status = 200) {
-  const obj = {
-    ok: status < 400,
+  return new Response(JSON.stringify(data), {
     status,
-    exitCode: status < 400 ? 0 : 1,
-    json: () => Promise.resolve(data),
-    text: () => Promise.resolve(JSON.stringify(data)),
-    headers: new Headers(),
-  };
-  obj.json = obj.json.bind(obj);
-  obj.text = obj.text.bind(obj);
-  return obj;
+    headers: { "content-type": "application/json" },
+  });
 }
 
-async function captureStdout(fn: () => Promise<void>): Promise<string> {
+async function captureStdout(fn: () => Promise<void> | void): Promise<string> {
+  const orig = process.stdout.write;
   const chunks: string[] = [];
-  const orig = process.stdout.write.bind(process.stdout);
-  process.stdout.write = (c: string | Uint8Array) => {
-    if (typeof c === "string") chunks.push(c);
+  process.stdout.write = (chunk: Uint8Array | string) => {
+    chunks.push(typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk));
     return true;
   };
   try {
@@ -58,7 +36,9 @@ async function captureStdout(fn: () => Promise<void>): Promise<string> {
 }
 
 function makeCmd(output = "json") {
-  return { optsWithGlobals: () => ({ output, quiet: output !== "table" }) };
+  return {
+    optsWithGlobals: () => ({ output, quiet: output !== "table" }),
+  } as unknown as import("commander").Command;
 }
 
 test("runOAuthStatus filtra apenas conexões oauth/oauth2", async () => {
@@ -66,16 +46,16 @@ test("runOAuthStatus filtra apenas conexões oauth/oauth2", async () => {
   globalThis.fetch = ((url: string) => {
     assert.ok(url.includes("/api/providers"));
     return Promise.resolve(makeResp({ providers: CONNECTIONS }));
-  }) as any;
+  }) as unknown as typeof fetch;
 
   const { runOAuthStatus } = await import("../../bin/cli/commands/oauth.mjs");
-  const out = await captureStdout(() => runOAuthStatus({}, makeCmd() as any));
+  const out = await captureStdout(() => runOAuthStatus({}, makeCmd()));
 
   globalThis.fetch = origFetch;
   const parsed = JSON.parse(out);
   assert.ok(Array.isArray(parsed));
   assert.equal(parsed.length, 2);
-  assert.ok(parsed.every((c: any) => c.authType === "oauth" || c.authType === "oauth2"));
+  assert.ok(parsed.every((c: Connection) => c.authType === "oauth" || c.authType === "oauth2"));
 });
 
 test("runOAuthStatus filtra por provider", async () => {
@@ -86,10 +66,10 @@ test("runOAuthStatus filtra por provider", async () => {
     return Promise.resolve(
       makeResp({ providers: CONNECTIONS.filter((c) => c.provider === "gemini") })
     );
-  }) as any;
+  }) as unknown as typeof fetch;
 
   const { runOAuthStatus } = await import("../../bin/cli/commands/oauth.mjs");
-  await captureStdout(() => runOAuthStatus({ provider: "gemini" }, makeCmd() as any));
+  await captureStdout(() => runOAuthStatus({ provider: "gemini" }, makeCmd()));
 
   globalThis.fetch = origFetch;
   assert.ok(capturedUrl.includes("provider=gemini"));
@@ -100,15 +80,15 @@ test("runOAuthStatus consumes the connections envelope", async () => {
   globalThis.fetch = ((url: string) => {
     assert.ok(url.includes("/api/providers"));
     return Promise.resolve(makeResp({ connections: CONNECTIONS }));
-  }) as any;
+  }) as unknown as typeof fetch;
 
   try {
     const { runOAuthStatus } = await import("../../bin/cli/commands/oauth.mjs");
-    const out = await captureStdout(() => runOAuthStatus({}, makeCmd() as any));
+    const out = await captureStdout(() => runOAuthStatus({}, makeCmd()));
     const parsed = JSON.parse(out);
     assert.deepEqual(
       parsed.map((connection: { id: string }) => connection.id),
-      ["conn1", "conn2"],
+      ["conn1", "conn2"]
     );
   } finally {
     globalThis.fetch = origFetch;
@@ -119,15 +99,15 @@ test("runOAuthRevoke com --yes chama endpoint de revogação", async () => {
   let capturedUrl = "";
   let capturedMethod = "";
   const origFetch = globalThis.fetch;
-  globalThis.fetch = ((url: string, opts: any) => {
+  globalThis.fetch = ((url: string, opts?: RequestInit) => {
     capturedUrl = url;
     capturedMethod = opts?.method ?? "GET";
     return Promise.resolve(makeResp({}));
-  }) as any;
+  }) as unknown as typeof fetch;
 
   const out = await captureStdout(async () => {
     const { runOAuthRevoke } = await import("../../bin/cli/commands/oauth.mjs");
-    await runOAuthRevoke({ provider: "gemini", yes: true }, makeCmd() as any);
+    await runOAuthRevoke({ provider: "gemini", yes: true }, makeCmd());
   });
 
   globalThis.fetch = origFetch;
@@ -140,18 +120,15 @@ test("runOAuthRevoke com connectionId usa DELETE no provider", async () => {
   let capturedUrl = "";
   let capturedMethod = "";
   const origFetch = globalThis.fetch;
-  globalThis.fetch = ((url: string, opts: any) => {
+  globalThis.fetch = ((url: string, opts?: RequestInit) => {
     capturedUrl = url;
     capturedMethod = opts?.method ?? "GET";
     return Promise.resolve(makeResp({}));
-  }) as any;
+  }) as unknown as typeof fetch;
 
   const out = await captureStdout(async () => {
     const { runOAuthRevoke } = await import("../../bin/cli/commands/oauth.mjs");
-    await runOAuthRevoke(
-      { provider: "gemini", connectionId: "conn1", yes: true },
-      makeCmd() as any
-    );
+    await runOAuthRevoke({ provider: "gemini", connectionId: "conn1", yes: true }, makeCmd());
   });
 
   globalThis.fetch = origFetch;
@@ -164,15 +141,15 @@ test("runOAuthStart flow=import chama endpoint de import", async () => {
   let capturedUrl = "";
   let capturedMethod = "";
   const origFetch = globalThis.fetch;
-  globalThis.fetch = ((url: string, opts: any) => {
+  globalThis.fetch = ((url: string, opts?: RequestInit) => {
     capturedUrl = url;
     capturedMethod = opts?.method ?? "GET";
     return Promise.resolve(makeResp({ count: 3 }));
-  }) as any;
+  }) as unknown as typeof fetch;
 
   const out = await captureStdout(async () => {
     const { runOAuthStart } = await import("../../bin/cli/commands/oauth.mjs");
-    await runOAuthStart({ provider: "cursor" }, makeCmd() as any);
+    await runOAuthStart({ provider: "cursor" }, makeCmd());
   });
 
   globalThis.fetch = origFetch;
@@ -187,11 +164,11 @@ test("runOAuthStart flow=import com --import-from-system usa auto-import", async
   globalThis.fetch = ((url: string) => {
     capturedUrl = url;
     return Promise.resolve(makeResp({ count: 1 }));
-  }) as any;
+  }) as unknown as typeof fetch;
 
   const out = await captureStdout(async () => {
     const { runOAuthStart } = await import("../../bin/cli/commands/oauth.mjs");
-    await runOAuthStart({ provider: "zed", importFromSystem: true }, makeCmd() as any);
+    await runOAuthStart({ provider: "zed", importFromSystem: true }, makeCmd());
   });
 
   globalThis.fetch = origFetch;
@@ -229,17 +206,18 @@ test("providers lista provedores OAuth conhecidos", async () => {
   const { PROVIDERS_WITH_OAUTH_TEST } = await import("../../bin/cli/commands/oauth.mjs").catch(
     () => ({ PROVIDERS_WITH_OAUTH_TEST: null })
   );
+  void PROVIDERS_WITH_OAUTH_TEST;
   // validate via runOAuthStart unknown provider exits
   const origExit = process.exit;
   let exitCode: number | undefined;
-  process.exit = ((code: number) => {
-    exitCode = code;
+  process.exit = ((code?: number | string | null): never => {
+    exitCode = typeof code === "number" ? code : undefined;
     throw new Error("exit");
-  }) as any;
+  }) as typeof process.exit;
 
   try {
     const { runOAuthStart } = await import("../../bin/cli/commands/oauth.mjs");
-    await runOAuthStart({ provider: "unknown_provider_xyz" }, makeCmd() as any).catch(() => {});
+    await runOAuthStart({ provider: "unknown_provider_xyz" }, makeCmd()).catch(() => {});
   } catch {
     // expected
   }
