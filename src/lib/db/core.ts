@@ -962,6 +962,51 @@ function startDbHealthCheckScheduler(db: SqliteDatabase) {
   dbHealthCheckTimer.unref?.();
 }
 
+let walTruncateTimer: NodeJS.Timeout | null = null;
+
+function getWalTruncateIntervalMs(): number {
+  const rawValue = process.env.OMNIROUTE_WAL_TRUNCATE_INTERVAL_MS;
+  if (typeof rawValue === "string" && rawValue.trim().length > 0) {
+    const parsed = Number(rawValue);
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      return parsed;
+    }
+  }
+  return 6 * 60 * 60 * 1000;
+}
+
+function clearWalTruncateScheduler() {
+  if (walTruncateTimer) {
+    clearInterval(walTruncateTimer);
+    walTruncateTimer = null;
+  }
+}
+
+// Auto-checkpoint moves WAL pages back into the main DB file but never shrinks the WAL
+// file itself; only wal_checkpoint(TRUNCATE) does, and a long-running server never closes its DB.
+function startWalTruncateScheduler(db: SqliteDatabase) {
+  clearWalTruncateScheduler();
+  if (isCloud || isBuildPhase || isAutomatedTestProcess()) return;
+
+  const intervalMs = getWalTruncateIntervalMs();
+  if (intervalMs <= 0) return;
+
+  walTruncateTimer = setInterval(() => {
+    try {
+      if (!db.open) return;
+      // TRUNCATE waits for readers; under concurrent write load it can no-op without
+      // shrinking the file. That is expected — it retries on the next tick.
+      if (checkpointDb(db, "TRUNCATE")) {
+        console.log("[DB] Periodic SQLite WAL checkpoint completed (TRUNCATE).");
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn("[DB] Periodic WAL truncate failed:", message);
+    }
+  }, intervalMs);
+  walTruncateTimer.unref?.();
+}
+
 export function runManagedDbHealthCheck(options?: { autoRepair?: boolean }) {
   const db = getDbInstance();
   return runDbHealthCheck(db, {
@@ -1308,6 +1353,7 @@ export function getDbInstance(): SqliteDatabase {
   }
 
   startDbHealthCheckScheduler(db);
+  startWalTruncateScheduler(db);
   // Log the resolved absolute DATA_DIR + SQLITE_FILE once at init so a
   // multi-replica / Docker volume-topology mismatch (each replica opening a
   // different on-disk DB → "phantom"/missing combos & connections) is
@@ -1335,6 +1381,7 @@ export function pingDb(): boolean {
 
 export function closeDbInstance(options?: { checkpointMode?: CheckpointMode | null }): boolean {
   clearDbHealthCheckScheduler();
+  clearWalTruncateScheduler();
   const db = getDb();
   if (!db) return false;
 
