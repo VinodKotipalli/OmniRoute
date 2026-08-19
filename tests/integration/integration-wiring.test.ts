@@ -59,10 +59,6 @@ describe("Pipeline Wiring — server-init.ts", () => {
     assert.match(src, /cleanupExpiredLogs/);
   });
 
-  it("should enforce secrets before startup", () => {
-    assert.match(src, /enforceSecrets/);
-  });
-
   it("should enforce web runtime env before startup", () => {
     assert.match(src, /enforceWebRuntimeEnv/);
   });

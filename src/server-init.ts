@@ -1,7 +1,6 @@
 // Server startup script
 import initializeCloudSync from "./shared/services/initializeCloudSync";
 import { enforceWebRuntimeEnv } from "./lib/env/runtimeEnv";
-import { enforceSecrets } from "./shared/utils/secretsValidator";
 import { initAuditLog, cleanupExpiredLogs, logAuditEvent } from "./lib/compliance/index";
 import { initConsoleInterceptor } from "./lib/consoleInterceptor";
 import { registerBudgetResetJob } from "./lib/jobs/budgetResetJob";
@@ -33,8 +32,7 @@ async function startServer() {
   // Console interceptor: capture all console output to log file (must be first)
   initConsoleInterceptor();
 
-  // FASE-01: Validate required secrets before anything else (fail-fast)
-  enforceSecrets();
+  // FASE-01: Validate required secrets and runtime env before anything else (fail-fast)
   enforceWebRuntimeEnv();
 
   // Compliance: Initialize audit_log table
