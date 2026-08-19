@@ -347,10 +347,7 @@ async function syncNativeAssetsToDir(projectRoot, outDir, fsImpl, log) {
     if (!(await exists(sourcePath))) continue;
 
     const destinationPath = path.join(outDir, ...entry.dest);
-    // See resolvesToSamePath/clearStaleDest (sync copy path, same module) — the same
-    // ERR_FS_CP_EINVAL/ERR_FS_CP_DIR_TO_NON_DIR races apply to fsImpl.cp here.
-    if (resolvesToSamePath(sourcePath, destinationPath)) continue;
-    clearStaleDest(destinationPath);
+    if (path.resolve(sourcePath) === path.resolve(destinationPath)) continue;
 
     const mkdir =
       typeof fsImpl.mkdir === "function" ? fsImpl.mkdir.bind(fsImpl) : fs.mkdir.bind(fs);
@@ -388,8 +385,7 @@ async function syncExtraModulesToDir(projectRoot, outDir, fsImpl, log) {
     if (!(await exists(sourcePath))) continue;
 
     const destPath = path.join(outDir, ...entry.dest);
-    if (resolvesToSamePath(sourcePath, destPath)) continue;
-    clearStaleDest(destPath);
+    if (path.resolve(sourcePath) === path.resolve(destPath)) continue;
 
     const mkdir =
       typeof fsImpl.mkdir === "function" ? fsImpl.mkdir.bind(fsImpl) : fs.mkdir.bind(fs);
@@ -539,46 +535,6 @@ function copyStaticAndPublic({ distDir, relDistDir, projectRoot, resolvedOutDir 
 }
 
 /**
- * Two independent copy passes assemble a bundle: the bulk "standalone -> outDir" tree
- * copy (step 1 of assembleStandalone) can already have carried a prior entry's result
- * into `dest` (e.g. an absolute pnpm-store symlink, or a directory) BEFORE this entry's
- * own copy runs. `fs.cpSync`/`fs.cp` refuse to overwrite in two such cases even with
- * `force: true`:
- *   - dest already resolves (via symlink chain) to the exact same real path as src ->
- *     ERR_FS_CP_EINVAL "src and dest cannot be the same".
- *   - dest exists with a different node type than src (file/symlink vs directory) ->
- *     ERR_FS_CP_DIR_TO_NON_DIR / ERR_FS_CP_NON_DIR_TO_DIR.
- * Under heavy concurrent build I/O this manifested non-deterministically across
- * different EXTRA_MODULE_ENTRIES/NATIVE_ASSET_ENTRIES on every retry. Resolve both
- * cases up front: skip entirely when dest is already the right target, otherwise clear
- * whatever stale node occupies dest (via lstat, so it also removes a broken symlink)
- * so the fresh copy always lands cleanly.
- *
- * @param {string} src
- * @param {string} dest
- * @returns {boolean} true when dest already IS src's target and no copy is needed
- */
-function resolvesToSamePath(src, dest) {
-  if (path.resolve(src) === path.resolve(dest)) return true;
-  if (!fsSync.existsSync(dest)) return false;
-  try {
-    return fsSync.realpathSync(src) === fsSync.realpathSync(dest);
-  } catch {
-    return false;
-  }
-}
-
-/** @see resolvesToSamePath — clears whatever stale node sits at `dest` before a copy. */
-function clearStaleDest(dest) {
-  try {
-    fsSync.lstatSync(dest);
-  } catch {
-    return;
-  }
-  fsSync.rmSync(dest, { recursive: true, force: true });
-}
-
-/**
  * Copy native assets (better-sqlite3 and TPROXY) and extra runtime modules/sidecars
  * (wreq-js, pino, migrations, MITM server, helper scripts, sqlite-vec platform packages, …)
  * into the assembled bundle. Missing sources are skipped silently.
@@ -591,8 +547,7 @@ function copyNativeAssetsAndExtraModules(projectRoot, resolvedOutDir) {
     const src = path.join(projectRoot, ...asset.src);
     if (!fsSync.existsSync(src)) continue;
     const dest = path.join(resolvedOutDir, ...asset.dest);
-    if (resolvesToSamePath(src, dest)) continue;
-    clearStaleDest(dest);
+    if (path.resolve(src) === path.resolve(dest)) continue;
     fsSync.mkdirSync(path.dirname(dest), { recursive: true });
     fsSync.cpSync(src, dest, { recursive: true, force: true });
     console.log(`[assembleStandalone] Copied native asset: ${asset.label}`);
@@ -602,8 +557,7 @@ function copyNativeAssetsAndExtraModules(projectRoot, resolvedOutDir) {
     const src = path.join(projectRoot, ...mod.src);
     if (!fsSync.existsSync(src)) continue;
     const dest = path.join(resolvedOutDir, ...mod.dest);
-    if (resolvesToSamePath(src, dest)) continue;
-    clearStaleDest(dest);
+    if (path.resolve(src) === path.resolve(dest)) continue;
     fsSync.mkdirSync(path.dirname(dest), { recursive: true });
     fsSync.cpSync(src, dest, { recursive: true, force: true });
     console.log(`[assembleStandalone] Synced module: ${mod.label}`);
@@ -663,12 +617,6 @@ function repairEmptyExternalPackageDirs(projectRoot, resolvedOutDir) {
       continue;
     }
     if (!sourceStat.isDirectory()) continue;
-    // See resolvesToSamePath/clearStaleDest above: bundlePkgDir can itself be a
-    // symlink to sourcePkgDir's realpath whose target momentarily read as empty
-    // under heavy concurrent build I/O (a transient readdirSync race, not a real
-    // hollow placeholder), or a stale non-directory node from an earlier pass.
-    if (resolvesToSamePath(sourcePkgDir, bundlePkgDir)) continue;
-    clearStaleDest(bundlePkgDir);
 
     fsSync.cpSync(sourcePkgDir, bundlePkgDir, { recursive: true, force: true });
     summary.repaired += 1;
