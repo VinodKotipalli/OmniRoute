@@ -33,7 +33,7 @@ import { assembleStreamingResponseHeaders } from "./chatCore/streamingResponseHe
 import { storeStreamingSemanticCacheResponse } from "./chatCore/streamingSemanticCacheStore.ts";
 import { assembleStreamingPipeline } from "./chatCore/streamingPipeline.ts";
 import { sanitizeChatRequestBody } from "./chatCore/sanitization.ts";
-import { applyResponsesInputPolicy } from "../services/responsesInputPolicy.ts";
+import { applyReasoningInputPolicy } from "../services/reasoningInputPolicy.ts";
 import {
   getHeaderValueCaseInsensitive,
   isNoMemoryRequested,
@@ -470,6 +470,7 @@ export async function handleChatCore({
   conversationId = null,
   modelPinned = false,
   skipResourcePressureGuard = false,
+  reasoningTransportFallback = "skip",
   managedLease = null,
 }) {
   let { provider, model, extendedContext } = modelInfo;
@@ -722,12 +723,13 @@ export async function handleChatCore({
     copilotCompatibleReasoning,
     clientResponseFormat,
   } = resolveChatCoreRequestFormat({ clientRawRequest, body, provider, userAgent });
-  const nativeOpenAICompatibleResponsesPassthrough = shouldUseNativeOpenAICompatibleResponsesPassthrough({
-    provider,
-    sourceFormat,
-    endpointPath,
-    providerSpecificData: credentials?.providerSpecificData,
-  });
+  const nativeOpenAICompatibleResponsesPassthrough =
+    shouldUseNativeOpenAICompatibleResponsesPassthrough({
+      provider,
+      sourceFormat,
+      endpointPath,
+      providerSpecificData: credentials?.providerSpecificData,
+    });
   const responsesInputItems = Array.isArray(body?.input) ? body.input : [];
   const customToolNames = collectCustomToolNamesForSourceFormat(
     sourceFormat,
@@ -1185,11 +1187,30 @@ export async function handleChatCore({
     return cacheHit;
   }
 
-  if (targetFormat === FORMATS.OPENAI_RESPONSES && body && typeof body === "object") {
-    applyResponsesInputPolicy(
+  const reasoningInputFormat =
+    sourceFormat === FORMATS.OPENAI_RESPONSES
+      ? "responses"
+      : sourceFormat === FORMATS.OPENAI
+        ? "chat"
+        : null;
+  if (reasoningInputFormat && body && typeof body === "object") {
+    const policy = applyReasoningInputPolicy(
       body as Record<string, unknown>,
-      credentials?.providerSpecificData?.preserveEncryptedReasoning === true
+      reasoningInputFormat,
+      {
+        provider,
+        preserveEncryptedReasoning:
+          credentials?.providerSpecificData?.preserveEncryptedReasoning === true,
+        onIncompatibleReasoning: reasoningTransportFallback === "drop" ? "drop" : "reject",
+      }
     );
+    if (policy.incompatibleReasoning) {
+      trackPendingRequest(model, provider, connectionId, false);
+      return createErrorResult(
+        HTTP_STATUS.BAD_REQUEST,
+        "Reasoning continuation is not compatible with the selected target"
+      );
+    }
   }
 
   body = sanitizeChatRequestBody(body, sourceFormat, targetFormat);

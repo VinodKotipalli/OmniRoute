@@ -422,6 +422,7 @@ export async function executeChatWithBreaker({
   conversationId = null,
   modelPinned = false,
   routingComboId = null,
+  reasoningTransportFallback = "skip",
   sessionAffinityKey = null,
   managedLease = null,
 }: ExecuteChatWithBreakerOptions): Promise<ExecuteChatWithBreakerResult> {
@@ -481,6 +482,7 @@ export async function executeChatWithBreaker({
             modelPinned,
             routingComboId,
             sessionAffinityKey,
+            reasoningTransportFallback,
             managedLease,
             skipResourcePressureGuard: true,
             onCredentialsRefreshed: async (newCreds: any) => {

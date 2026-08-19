@@ -233,7 +233,7 @@ test("handleResponsesCore preserves Kimi K3 reasoning through provider translati
       { role: "user", content: [{ type: "input_text", text: "Call search." }] },
       {
         type: "reasoning",
-        summary: [{ type: "summary_text", text: "I should search first." }],
+        content: [{ type: "reasoning_text", text: "I should search first." }],
       },
       {
         type: "function_call",

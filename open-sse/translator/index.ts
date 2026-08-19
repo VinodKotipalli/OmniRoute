@@ -202,6 +202,88 @@ function requiresReasoningContentPresence(provider: unknown, model: unknown): bo
   return normalizedProvider === "xiaomi-mimo" || /(^|\/)mimo/i.test(normalizedModel);
 }
 
+type OpenAIReplayOptions = {
+  canReplayReasoningOnly: boolean;
+  requiresExplicitReasoningReplay: boolean;
+  provider: string;
+  model: string;
+  reasoningCacheScope?: string | null;
+};
+
+function replayOpenAIReasoningMessage(
+  messages: Array<Record<string, unknown>>,
+  messageIndex: number,
+  options: OpenAIReplayOptions
+): void {
+  const message = messages[messageIndex];
+  if (!message || message.role !== "assistant") return;
+
+  // Moonshot `partial` messages are output prefixes, not completed prior turns.
+  if (message.partial === true) {
+    if (message.reasoning_content === "") delete message.reasoning_content;
+    return;
+  }
+
+  if (
+    !hasNonEmptyReasoningContent(message) &&
+    typeof message.reasoning === "string" &&
+    message.reasoning.trim().length > 0
+  ) {
+    message.reasoning_content = message.reasoning;
+  }
+
+  const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
+  const hasToolCalls = toolCalls.length > 0;
+  const shouldReplayReasoningOnly =
+    !hasToolCalls && options.canReplayReasoningOnly && !hasNonEmptyReasoningContent(message);
+
+  if (!hasToolCalls && !shouldReplayReasoningOnly) {
+    if (
+      message.reasoning_content === "" ||
+      isInternalReasoningPlaceholder(message.reasoning_content)
+    ) {
+      delete message.reasoning_content;
+    }
+    return;
+  }
+
+  if (hasNonEmptyReasoningContent(message)) {
+    if (!isInternalReasoningPlaceholder(message.reasoning_content)) return;
+    delete message.reasoning_content;
+  }
+
+  const firstToolCall =
+    toolCalls[0] && typeof toolCalls[0] === "object" && !Array.isArray(toolCalls[0])
+      ? (toolCalls[0] as Record<string, unknown>)
+      : null;
+  const cacheKey = hasToolCalls
+    ? typeof firstToolCall?.id === "string"
+      ? firstToolCall.id
+      : ""
+    : buildAssistantMessageCacheKey(options.reasoningCacheScope, messages, messageIndex);
+  if (cacheKey) {
+    const cached = lookupReasoning(cacheKey);
+    if (cached) {
+      message.reasoning_content = cached;
+      recordReplay();
+      return;
+    }
+  }
+
+  if (options.requiresExplicitReasoningReplay) {
+    if (message.reasoning_content === "") delete message.reasoning_content;
+    return;
+  }
+
+  if ((hasToolCalls || shouldReplayReasoningOnly) && !message.reasoning_content) {
+    if (requiresReasoningContentPresence(options.provider, options.model)) {
+      message.reasoning_content = NON_ANTHROPIC_THINKING_PLACEHOLDER;
+    } else {
+      delete message.reasoning_content;
+    }
+  }
+}
+
 /** @param options.normalizeToolCallId - When true, use 9-char tool call ids (e.g. Mistral); when false, leave ids as-is */
 /** @param options.preserveDeveloperRole - undefined/true: keep developer for OpenAI format (default); false: map to system */
 /** @param options.preserveCacheControl - When true, preserve client-side cache_control markers (for Claude Code, etc.) */
@@ -319,6 +401,25 @@ export function translateRequest(
   // providers and for already-compliant requests (prompt-cache prefix stability).
   if (targetFormat === FORMATS.OPENAI && result.messages && Array.isArray(result.messages)) {
     result.messages = hoistLeadingSystemMessage(result.messages, provider);
+  }
+
+  if (
+    sourceFormat === FORMATS.OPENAI &&
+    targetFormat === FORMATS.OPENAI_RESPONSES &&
+    isReasoner &&
+    Array.isArray(result.messages)
+  ) {
+    const messages = result.messages as Array<Record<string, unknown>>;
+    const replayOptions: OpenAIReplayOptions = {
+      canReplayReasoningOnly: isReasoningOnlyReplayTarget(normalizedProvider, normalizedModel),
+      requiresExplicitReasoningReplay,
+      provider: normalizedProvider,
+      model: normalizedModel,
+      reasoningCacheScope: options?.reasoningCacheScope,
+    };
+    for (let messageIndex = 0; messageIndex < messages.length; messageIndex += 1) {
+      replayOpenAIReasoningMessage(messages, messageIndex, replayOptions);
+    }
   }
 
   // If same format, skip translation steps
@@ -619,59 +720,13 @@ export function translateRequest(
       }
 
       // ── OpenAI-format message ──
-      // Skip if client already provided real reasoning_content. The internal
-      // replay placeholder is NOT real reasoning: drop it and fall through to
-      // the cache lookup so it can be replaced with genuine cached reasoning.
-      // Forwarding it makes the model continue its chain of thought from that
-      // text (echo → empty stop), and the echo re-poisons cache + client
-      // history (#9573).
-      if (hasNonEmptyReasoningContent(msg)) {
-        if (!isInternalReasoningPlaceholder(msg.reasoning_content)) {
-          continue;
-        }
-        delete msg.reasoning_content;
-      }
-
-      const cacheKey = hasToolCalls
-        ? msg.tool_calls[0]?.id
-        : buildAssistantMessageCacheKey(
-            options?.reasoningCacheScope,
-            result.messages,
-            messageIndex
-          );
-      if (cacheKey) {
-        const cached = lookupReasoning(cacheKey);
-        if (cached) {
-          msg.reasoning_content = cached;
-          recordReplay();
-          continue;
-        }
-      }
-
-      // Native Moonshot K3/K2.7 accepts only the real prior reasoning. If it
-      // was not supplied and the cache missed, leave it absent so upstream can
-      // enforce its contract instead of corrupting history with a placeholder.
-      if (requiresExplicitReasoningReplay) {
-        if (msg.reasoning_content === "") delete msg.reasoning_content;
-        continue;
-      }
-
-      // Cache miss fallback — previously injected a non-empty placeholder
-      // (NON_ANTHROPIC_THINKING_PLACEHOLDER) to dodge an alleged DeepSeek V4 400
-      // on missing reasoning_content. The placeholder is the root cause of this
-      // bug: the model echoes it as its own reasoning and stops (empty turns),
-      // and the echo re-poisons the cache + client history (#9573). Empirically,
-      // deepseek-v4-flash accepts an ABSENT reasoning_content field (the 400 is
-      // specific to empty-string, and even that is endpoint-dependent). Omit
-      // the field instead; providers that genuinely enforce the contract
-      // (kimi-coding, moonshot reasoning replay) have their own paths above.
-      if ((hasToolCalls || shouldReplayReasoningOnly) && !msg.reasoning_content) {
-        if (requiresReasoningContentPresence(normalizedProvider, normalizedModel)) {
-          msg.reasoning_content = NON_ANTHROPIC_THINKING_PLACEHOLDER;
-        } else {
-          delete msg.reasoning_content;
-        }
-      }
+      replayOpenAIReasoningMessage(result.messages, messageIndex, {
+        canReplayReasoningOnly,
+        requiresExplicitReasoningReplay,
+        provider: normalizedProvider,
+        model: normalizedModel,
+        reasoningCacheScope: options?.reasoningCacheScope,
+      });
     }
   } else if (
     !isReasoner &&

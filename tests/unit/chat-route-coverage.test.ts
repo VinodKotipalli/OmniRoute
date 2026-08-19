@@ -316,6 +316,87 @@ test("handleChat keeps protected combo fallback separate from Global Fallback Mo
   assert.equal(json.choices[0].message.content, "Global fallback answered");
 });
 
+test("handleChat defaults a Combo's incompatible reasoning fallback to drop", async () => {
+  await seedConnection("deepseek", { apiKey: "sk-deepseek-reasoning-drop" });
+  await combosDb.createCombo({
+    name: "reasoning-transport-drop",
+    strategy: "priority",
+    config: {
+      maxRetries: 0,
+      retryDelayMs: 0,
+    },
+    models: ["deepseek/deepseek-v4-flash"],
+  });
+
+  let upstreamBody: { input?: unknown } | null = null;
+  globalThis.fetch = async (_url, init = {}) => {
+    upstreamBody = JSON.parse(String(init.body));
+    return new Response(
+      JSON.stringify({
+        id: "resp_reasoning_drop",
+        object: "response",
+        status: "completed",
+        model: "deepseek-v4-flash",
+        output: [
+          {
+            id: "msg_reasoning_drop",
+            type: "message",
+            role: "assistant",
+            content: [
+              {
+                type: "output_text",
+                text: "continued without prior reasoning",
+                annotations: [],
+              },
+            ],
+          },
+        ],
+        usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  };
+
+  const response = await handleChat(
+    buildRequest({
+      url: "http://localhost/v1/responses",
+      body: {
+        model: "reasoning-transport-drop",
+        stream: false,
+        input: [
+          { id: "rs_opaque", type: "reasoning", encrypted_content: "provider-state" },
+          {
+            id: "fc_call",
+            type: "function_call",
+            call_id: "call_1",
+            name: "search",
+            arguments: "{}",
+          },
+          { type: "function_call_output", call_id: "call_1", output: "done" },
+        ],
+      },
+    })
+  );
+
+  assert.equal(response.status, 200);
+  assert.ok(upstreamBody && Array.isArray(upstreamBody.input));
+  const upstreamInput = upstreamBody.input;
+  assert.equal(
+    upstreamInput.some(
+      (item) =>
+        item !== null && typeof item === "object" && "type" in item && item.type === "reasoning"
+    ),
+    false
+  );
+  assert.equal(
+    upstreamInput.some(
+      (item) =>
+        item !== null && typeof item === "object" && "type" in item && item.type === "function_call"
+    ),
+    true
+  );
+});
+
 test("handleChat keeps the combo error when the global fallback throws", async () => {
   await seedConnection("openai", { apiKey: "sk-openai-combo-fail" });
   await seedConnection("claude", { apiKey: "sk-claude-fallback-throw" });

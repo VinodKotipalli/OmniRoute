@@ -36,6 +36,7 @@ import {
 import { translateRequest } from "../../open-sse/translator/index.ts";
 import { FORMATS } from "../../open-sse/translator/formats.ts";
 import { ensureToolCallIds } from "../../open-sse/translator/helpers/toolCallHelper.ts";
+import { translateNonStreamingResponse } from "../../open-sse/handlers/responseTranslator.ts";
 import { getDbInstance } from "../../src/lib/db/core.ts";
 import { getReasoningCache, setReasoningCache } from "../../src/lib/db/reasoningCache.ts";
 import { DELETE, GET } from "../../src/app/api/cache/reasoning/route.ts";
@@ -625,6 +626,48 @@ describe("Reasoning Replay Cache — Translator Replay", () => {
     assert.equal(getReasoningCacheServiceStats().replays, 1);
   });
 
+  it("should replay cached DeepSeek reasoning before Chat converts to Responses input", () => {
+    clearReasoningCacheAll();
+    clearModelsDevCapabilities();
+    const callId = "call_ds_chat_to_responses";
+    cacheReasoning(callId, "deepseek", "deepseek-v4-flash", "Cached Chat continuation reasoning");
+
+    const translated = translateRequest(
+      FORMATS.OPENAI,
+      FORMATS.OPENAI_RESPONSES,
+      "deepseek-v4-flash",
+      {
+        reasoning_effort: "high",
+        messages: [
+          { role: "user", content: "Use the tool" },
+          {
+            role: "assistant",
+            content: null,
+            tool_calls: [
+              {
+                id: callId,
+                type: "function",
+                function: { name: "read_file", arguments: "{}" },
+              },
+            ],
+          },
+          { role: "tool", tool_call_id: callId, content: "contents" },
+        ],
+      },
+      false,
+      null,
+      "deepseek"
+    );
+
+    assert.deepEqual(
+      translated.input.find((item) => item.type === "reasoning"),
+      {
+        type: "reasoning",
+        content: [{ type: "reasoning_text", text: "Cached Chat continuation reasoning" }],
+      }
+    );
+  });
+
   it("should preserve DeepSeek Responses reasoning before Chat conversion", () => {
     clearReasoningCacheAll();
     clearModelsDevCapabilities();
@@ -645,7 +688,7 @@ describe("Reasoning Replay Cache — Translator Replay", () => {
         input: [
           {
             type: "reasoning",
-            summary: [{ type: "summary_text", text: "Client DeepSeek reasoning" }],
+            content: [{ type: "reasoning_text", text: "Client DeepSeek reasoning" }],
           },
           {
             type: "message",
@@ -679,6 +722,76 @@ describe("Reasoning Replay Cache — Translator Replay", () => {
     assert.equal(statsAfterTranslation.hits, statsBeforeTranslation.hits);
     assert.equal(statsAfterTranslation.misses, statsBeforeTranslation.misses);
     assert.equal(statsAfterTranslation.replays, statsBeforeTranslation.replays);
+  });
+
+  it("should cache only authentic plaintext from nonstream Responses output", () => {
+    clearReasoningCacheAll();
+    const callId = "call_nonstream_authentic_reasoning";
+    const translated = translateNonStreamingResponse(
+      {
+        object: "response",
+        model: "deepseek-v4-flash",
+        output: [
+          {
+            type: "reasoning",
+            content: [{ type: "reasoning_text", text: "Authentic provider reasoning" }],
+            summary: [{ type: "summary_text", text: "Display summary" }],
+          },
+          { type: "function_call", call_id: callId, name: "read_file", arguments: "{}" },
+        ],
+      },
+      FORMATS.OPENAI_RESPONSES,
+      FORMATS.OPENAI
+    ) as { choices?: Array<{ message?: Record<string, unknown> }> };
+    const message = translated.choices?.[0]?.message;
+
+    assert.ok(message);
+    assert.equal(message.reasoning_content, "Authentic provider reasoning");
+    assert.equal(cacheReasoningFromAssistantMessage(message, "deepseek", "deepseek-v4-flash"), 1);
+    assert.equal(lookupReasoning(callId), "Authentic provider reasoning");
+  });
+
+  it("should never cache Responses summaries or opaque plaintext companions", () => {
+    for (const [suffix, reasoningItem] of [
+      [
+        "summary",
+        {
+          type: "reasoning",
+          summary: [{ type: "summary_text", text: "Display-only summary" }],
+        },
+      ],
+      [
+        "mixed",
+        {
+          type: "reasoning",
+          encrypted_content: "opaque-provider-state",
+          content: [{ type: "reasoning_text", text: "Unsafe plaintext companion" }],
+          summary: [{ type: "summary_text", text: "Display-only mixed summary" }],
+        },
+      ],
+    ] as const) {
+      clearReasoningCacheAll();
+      const callId = `call_nonstream_${suffix}_reasoning`;
+      const translated = translateNonStreamingResponse(
+        {
+          object: "response",
+          model: "deepseek-v4-flash",
+          output: [
+            reasoningItem,
+            { type: "function_call", call_id: callId, name: "read_file", arguments: "{}" },
+          ],
+        },
+        FORMATS.OPENAI_RESPONSES,
+        FORMATS.OPENAI
+      ) as { choices?: Array<{ message?: Record<string, unknown> }> };
+      const message = translated.choices?.[0]?.message;
+
+      assert.ok(message);
+      assert.equal(message.reasoning_content, undefined);
+      assert.ok(Array.isArray(message.reasoning_summary));
+      assert.equal(cacheReasoningFromAssistantMessage(message, "deepseek", "deepseek-v4-flash"), 0);
+      assert.equal(lookupReasoning(callId), null);
+    }
   });
 
   it("should preserve client-provided reasoning content", () => {

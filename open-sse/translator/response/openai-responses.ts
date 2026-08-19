@@ -12,6 +12,7 @@ import {
   isInternalReasoningPlaceholder,
   stripInternalReasoningPlaceholder,
 } from "../../utils/reasoningPlaceholder.ts";
+import { extractReplayableResponsesReasoningText } from "../../services/reasoningInputPolicy.ts";
 import {
   normalizeToolName,
   stripEmptyOptionalToolArgs,
@@ -542,7 +543,8 @@ function emitToolCall(state, emit, tc) {
   const toolName = state.funcNames[tcIdx] || funcName || "";
   const lowerName = toolName.toLowerCase();
   const isCustomTool =
-    ((lowerName === "apply_patch" || lowerName === "applypatch") && !state.toolSchemas?.has?.(toolName)) ||
+    ((lowerName === "apply_patch" || lowerName === "applypatch") &&
+      !state.toolSchemas?.has?.(toolName)) ||
     state.customToolNames?.has?.(toolName) === true;
 
   if (!state.funcCallIds[tcIdx] && newCallId) state.funcCallIds[tcIdx] = newCallId;
@@ -614,7 +616,8 @@ function closeToolCall(state, emit, idx, recordAsCompleted = true) {
     // same classification independently for their respective add/close call sites).
     const lowerName = toolName.toLowerCase();
     const isCustomTool =
-      ((lowerName === "apply_patch" || lowerName === "applypatch") && !state.toolSchemas?.has?.(toolName)) ||
+      ((lowerName === "apply_patch" || lowerName === "applypatch") &&
+        !state.toolSchemas?.has?.(toolName)) ||
       state.customToolNames?.has?.(toolName) === true;
 
     let funcItem;
@@ -1042,6 +1045,17 @@ function openaiResponsesToOpenAIResponseStream(chunk, state) {
     return null;
   }
 
+  if (eventType === "response.output_item.done" && data.item?.type === "reasoning") {
+    const replayableReasoning = extractReplayableResponsesReasoningText(data.item);
+    if (replayableReasoning) {
+      const accumulated =
+        typeof state.accumulatedReasoning === "string" ? state.accumulatedReasoning : "";
+      state.accumulatedReasoning = accumulated
+        ? `${accumulated}\n\n${replayableReasoning}`
+        : replayableReasoning;
+    }
+  }
+
   // Function call done — emit args chunk from item.arguments when no deltas were received,
   // then advance the tool-call index. This handles Codex Responses API payloads that
   // carry the complete arguments only in output_item.done (no preceding delta events).
@@ -1054,6 +1068,28 @@ function openaiResponsesToOpenAIResponseStream(chunk, state) {
     const toolSchema = state.toolSchemas?.get(toolName);
     const shouldNormalizeArguments = toolName === "Agent";
     state.currentToolCallNeedsNormalization = shouldNormalizeArguments;
+
+    if (toolName && state.toolCalls instanceof Map) {
+      const completedArguments =
+        typeof item.arguments === "string" && item.arguments.length > 0 ? item.arguments : buffered;
+      const normalizedArguments = stripEmptyOptionalToolArgs(
+        completedArguments,
+        toolName,
+        toolSchema
+      );
+      state.toolCalls.set(currentIndex, {
+        id: callId,
+        index: currentIndex,
+        type: "function",
+        function: {
+          name: toolName,
+          arguments:
+            typeof normalizedArguments === "string"
+              ? normalizedArguments
+              : JSON.stringify(normalizedArguments ?? {}),
+        },
+      });
+    }
 
     // Track this call_id so response.completed doesn't synthesize a duplicate
     if (!state.toolCallIdsSeen) state.toolCallIdsSeen = new Set();
@@ -1314,12 +1350,8 @@ function openaiResponsesToOpenAIResponseStream(chunk, state) {
     return buildResponsesReasoningDeltaChunk(state, deltaText);
   }
 
-  // #5786 — reasoning summary exposed ONLY as a terminal snapshot on
-  // `response.output_item.done` (no preceding reasoning_summary_text.delta events — e.g.
-  // Codex reasoning models that surface the summary once at item close). Without this the
-  // reasoning channel is silently dropped and never reaches the client's thinking panel.
-  // Only synthesize when NO reasoning delta was already streamed for this item, so normal
-  // delta streams are never duplicated.
+  // Some providers expose completed reasoning only on `response.output_item.done`.
+  // Synthesize one Chat reasoning delta only when no delta was already emitted.
   if (eventType === "response.output_item.done" && data.item?.type === "reasoning") {
     const item = data.item;
     const itemId = item.id != null ? String(item.id) : "";
@@ -1333,6 +1365,11 @@ function openaiResponsesToOpenAIResponseStream(chunk, state) {
       state.reasoningDeltaEmitted &&
       !(state.reasoningItemsWithDelta instanceof Set && state.reasoningItemsWithDelta.size > 0);
     if (emittedForItem || emittedWithoutItemId) return null;
+
+    const replayableReasoning = extractReplayableResponsesReasoningText(item);
+    if (replayableReasoning) {
+      return buildResponsesReasoningDeltaChunk(state, replayableReasoning);
+    }
 
     // #7176/#7243: only synthesize from real upstream plaintext — never mutate
     // `item` and never fabricate placeholder text for encrypted-only reasoning.

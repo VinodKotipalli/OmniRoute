@@ -102,6 +102,8 @@ export interface RegistryOAuth {
   pollUrlBase?: string;
 }
 
+export type ReasoningTransport = "plaintext" | "opaque" | "none";
+
 export interface RegistryEntry {
   id: string;
   alias?: string;
@@ -114,6 +116,8 @@ export interface RegistryEntry {
   /** Override models URL used only for API key validation, not catalog discovery. */
   testKeyModelsUrl?: string;
   responsesBaseUrl?: string;
+  /** Provider-bound replay format; omitted providers accept portable plaintext reasoning. */
+  reasoningTransport?: ReasoningTransport;
   /** Anthropic-native /v1/messages endpoint (e.g. GitHub Copilot's shim) used
    *  for models tagged `targetFormat: "claude"` on an otherwise openai-format
    *  provider — see registry/github/index.ts. */

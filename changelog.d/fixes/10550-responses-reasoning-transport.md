@@ -1,0 +1,1 @@
+- Preserve portable plaintext reasoning by default across streaming and non-streaming Chat Completions and Responses routes while keeping provider-bound opaque state target-compatible. Combos now drop incompatible continuation reasoning by default and can explicitly skip incompatible targets, while known providers no longer show redundant encrypted-reasoning controls. (#10550)
