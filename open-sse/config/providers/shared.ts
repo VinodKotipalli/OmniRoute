@@ -46,6 +46,12 @@ export interface RegistryModel {
   id: string;
   name: string;
   aliases?: readonly string[];
+  /**
+   * Upstream model IDs that prove this static model is live when the provider
+   * has an authoritative synchronized catalog. Needed for curated IDs whose
+   * public name differs from the ID sent to the upstream service.
+   */
+  liveCatalogIds?: readonly string[];
   toolCalling?: boolean;
   supportsReasoning?: boolean;
   supportedThinkingEfforts?: readonly string[];

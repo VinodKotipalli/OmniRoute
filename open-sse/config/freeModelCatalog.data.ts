@@ -16,9 +16,11 @@ import type { FreeModelBudget } from "./freeModelCatalog.ts";
  * rewrites file timestamps on every deploy, which would report a months-old
  * catalog as "updated today". Bump this whenever the entries below change.
  */
-export const FREE_CATALOG_CURATED_AT = "2026-08-16";
+export const FREE_CATALOG_CURATED_AT = "2026-08-18";
 
 export const FREE_MODEL_BUDGETS: FreeModelBudget[] = [
+  { provider: "chatgpt-web", modelId: "gpt-5.6-luna-free", displayName: "GPT-5.6 Luna (Free)", monthlyTokens: 0, creditTokens: 0, freeType: "recurring-uncapped", poolKey: "chatgpt-web-free", tos: "caution" },
+  { provider: "chatgpt-web", modelId: "gpt-5.6-luna-free-thinking", displayName: "GPT-5.6 Luna (Free, Think)", monthlyTokens: 0, creditTokens: 0, freeType: "recurring-uncapped", poolKey: "chatgpt-web-free", tos: "caution" },
   { provider: "agentrouter", modelId: "claude-opus-4-8", displayName: "Claude Opus 4.8", monthlyTokens: 0, creditTokens: 200000000, freeType: "one-time-initial", poolKey: "agentrouter", tos: "caution" },
   { provider: "agentrouter", modelId: "claude-opus-5", displayName: "Claude Opus 5", monthlyTokens: 0, creditTokens: 200000000, freeType: "one-time-initial", poolKey: "agentrouter", tos: "caution" },
   { provider: "agentrouter", modelId: "gpt-5.6-sol", displayName: "GPT-5.6 Sol", monthlyTokens: 0, creditTokens: 200000000, freeType: "one-time-initial", poolKey: "agentrouter", tos: "caution" },
