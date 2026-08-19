@@ -167,6 +167,7 @@ _Living section — regenerated 2026-08-12 from all cycle commits (cycle open `e
 
 ### 🐛 Bug Fixes
 
+- **fusion**: fusion combos now apply the same vision-compatibility filter as every other combo strategy — a panel member or judge whose vision support cannot be confirmed is excluded from an image-bearing request instead of silently receiving it (port from upstream decolua/9router#3378)
 - **providers**: honor `PATCH /api/providers/[id]` so `omniroute providers rotate` stops 405ing (the OpenAPI spec and CLI already use PATCH) (PR #10366)
 - **executors**: fix internal timeout misclassified as client disconnect (499) for 7 niche executors — pass TimeoutError reason to controller.abort() (#8197 side-finding)
 - test(combo): guard auto/best-free never leaks the combo name as a model (#7754)

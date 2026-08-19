@@ -16,11 +16,18 @@ import { getCachedProviderConnections } from "../../../src/lib/db/readCache";
 import { getCircuitBreaker } from "../../../src/shared/utils/circuitBreaker";
 import { fisherYatesShuffle, getNextFromDeck } from "../../../src/shared/utils/shuffleDeck";
 import { handleFusionChat, type FusionTuning } from "../fusion.ts";
+import { getResolvedModelCapabilities } from "../modelCapabilities.ts";
+import { errorResponseWithComboDiagnostics } from "../../utils/error.ts";
 import { parseModel } from "../model.ts";
 import { handlePipelineChat, type PipelineStep } from "../pipeline.ts";
 import type { resolveComboSetupConfig } from "../comboConfig.ts";
 import { clampComboDepth, MAX_GLOBAL_ATTEMPTS, resolveDelayMs } from "./comboPredicates.ts";
-import { resolveComboRuntimeUnits, resolveComboTargets } from "./comboStructure.ts";
+import {
+  deriveRequestCompatibilityRequirements,
+  isVisionIncompatibleTarget,
+  resolveComboRuntimeUnits,
+  resolveComboTargets,
+} from "./comboStructure.ts";
 import { isComboModelVisible } from "./comboVisibility.ts";
 import { buildFusionHandleSingleModel, extractFusionPanelSpec } from "./fusionPanel.ts";
 import {
@@ -393,14 +400,27 @@ export async function tryFusionDispatch(args: {
 }): Promise<Response | null> {
   const { cfg, combo, config, strategy, log } = args;
   const configuredJudge = typeof cfg.judgeModel === "string" ? cfg.judgeModel : undefined;
+  const judgeFusionRequirements = deriveRequestCompatibilityRequirements(args.body);
+  // #3378: the judge stays in the original conversation (full history, including
+  // any image_url blocks) — a judge whose vision support cannot be confirmed is
+  // exactly as unsafe as an unconfirmed panel member (#8332). Drop it the same
+  // way an operator-hidden judge is dropped below, so fusion falls back to a
+  // (vision-confirmed) panel member instead of silently losing the image for
+  // the synthesis step.
+  const judgeLacksConfirmedVision =
+    judgeFusionRequirements.requiresVision &&
+    !!configuredJudge &&
+    getResolvedModelCapabilities(configuredJudge).supportsVision !== true;
   // The panel is filtered for hidden models by resolveComboTargets, but the
   // explicit judge is a bare string that never passes through it (#8878). Drop a
   // hidden judge so fusion falls back to a surviving panel member instead of
   // dispatching a model the operator hid.
   const judgeModel =
-    configuredJudge && !isComboModelVisible(configuredJudge, null, args.hiddenModelsByProvider)
-      ? undefined
-      : configuredJudge;
+    configuredJudge &&
+    !judgeLacksConfirmedVision &&
+    isComboModelVisible(configuredJudge, null, args.hiddenModelsByProvider)
+      ? configuredJudge
+      : undefined;
   const fusionTuning =
     cfg.fusionTuning && typeof cfg.fusionTuning === "object"
       ? (cfg.fusionTuning as FusionTuning)
@@ -413,12 +433,50 @@ export async function tryFusionDispatch(args: {
   }
   if (strategy !== "fusion") return null;
 
-  const resolvedFusionTargets = resolveComboTargets(
+  const allResolvedFusionTargets = resolveComboTargets(
     combo,
     args.allCombos,
     clampComboDepth(config.maxComboDepth),
     args.hiddenModelsByProvider
   );
+  // #3378 (ported from upstream decolua/9router): every non-fusion combo
+  // strategy runs candidates through filterTargetsByRequestCompatibility before
+  // dispatch, which excludes a target whose vision support cannot be *confirmed*
+  // `=== true` for an image-bearing request (#8332 — unknown is treated the same
+  // as unsupported, never silently forwarded). Fusion resolved its panel via the
+  // raw target list and skipped that filter entirely, so a panel member with an
+  // unrecognized model id (capability lookup misses -> supportsVision !== true)
+  // still received the unmodified image body while the panel silently lost a
+  // "confirmed vision" voice. Apply the same exclusion here so the fusion panel
+  // only fans an image request out to targets with confirmed vision support.
+  const fusionRequirements = judgeFusionRequirements;
+  const resolvedFusionTargets = fusionRequirements.requiresVision
+    ? allResolvedFusionTargets.filter(
+        (target) => !isVisionIncompatibleTarget(target, fusionRequirements)
+      )
+    : allResolvedFusionTargets;
+  if (fusionRequirements.requiresVision && resolvedFusionTargets.length === 0) {
+    log.warn(
+      "COMBO",
+      `Combo "${combo.name}" fusion panel has no target with confirmed vision support for this image request — every candidate was excluded (#3378)`
+    );
+    return errorResponseWithComboDiagnostics(
+      400,
+      `No target in combo ${combo.name} has confirmed vision support for this image request`,
+      {
+        poolSize: allResolvedFusionTargets.length,
+        attempted: 0,
+        excluded: allResolvedFusionTargets.map((target) => ({
+          provider: target.provider,
+          model: target.modelStr,
+          reason: "vision",
+        })),
+        attemptOrder: [],
+        terminalReason: "capability_mismatch",
+      },
+      { code: "capability_mismatch", type: "invalid_request_error" }
+    );
+  }
   // extractFusionPanelSpec only understands model strings / combo refs, so the
   // resolved targets have to be flattened before it runs. Keep them indexed so
   // the panel can be rehydrated below — dispatching the bare strings strips
