@@ -1,0 +1,1 @@
+- **fix(search):** `POST /v1/search` 502/504 responses now name the failing provider and a sanitized Node cause code (`ENETUNREACH`, `ECONNREFUSED`) instead of a generic `Search provider error: fetch failed` ([#10735](https://github.com/diegosouzapw/OmniRoute/issues/10735))
