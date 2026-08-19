@@ -5,8 +5,10 @@ import {
   type AlternateFormat,
 } from "../config/providers/alternateFormats.ts";
 import {
+  ANTHROPIC_SKILLS_BETA,
   CLAUDE_CLI_BILLING_VERSION,
   CLAUDE_CLI_STAINLESS_RUNTIME_VERSION,
+  hasCodeExecutionTool,
   mergeClientAnthropicBeta,
   normalizeAnthropicHeaderVariants,
 } from "../config/anthropicHeaders.ts";
@@ -852,6 +854,14 @@ export class BaseExecutor {
       // fallback URL). No-op when nothing has been learned this execute().
       if (thinkingBudgetClampedMax !== null) {
         clampNestedThinkingBudget(transformedBody, thinkingBudgetClampedMax);
+      }
+
+      // #9064 follow-up: the skills beta is only legal next to a code_execution
+      // tool (Anthropic 400s "Skills beta requires the code_execution tool" on
+      // every model otherwise), so it is not in the static API-key header any
+      // more and is appended per request, from the body that is actually sent.
+      if (this.provider === "anthropic" && hasCodeExecutionTool(transformedBody)) {
+        appendAnthropicBetaHeader(headers, ANTHROPIC_SKILLS_BETA);
       }
 
       try {

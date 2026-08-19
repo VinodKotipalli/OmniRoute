@@ -26,8 +26,38 @@ const ANTHROPIC_BETA_BASE = Object.freeze([
   "extended-cache-ttl-2025-04-11",
   "cache-diagnosis-2026-04-07",
   "code-execution-2025-08-25",
-  "skills-2025-10-02",
 ]);
+
+/**
+ * `skills-2025-10-02` is deliberately NOT part of the static base set. Anthropic
+ * rejects every request that carries it without a `code_execution` tool —
+ * `400 "Skills beta requires the code_execution tool to be included in the
+ * request"` — on every model, so putting it in the static header (#9064) turned
+ * every plain API-key request that declares no code_execution tool into a 400.
+ * It reaches upstream in exactly two cases: the client negotiated it itself
+ * (FORWARDABLE_CLIENT_BETAS below), or the outgoing body declares a
+ * code_execution tool (see hasCodeExecutionTool + the executor's per-request
+ * append), which is the raw-curl `container.skills` case #9064 was about.
+ */
+export const ANTHROPIC_SKILLS_BETA = "skills-2025-10-02";
+
+/**
+ * Whether a Messages-API body declares Anthropic's server-side code_execution
+ * tool (`{ type: "code_execution_20250825", name: "code_execution" }` and later
+ * revisions). Only then is the skills beta accepted upstream.
+ */
+export function hasCodeExecutionTool(body: unknown): boolean {
+  if (!body || typeof body !== "object") return false;
+  const tools = (body as { tools?: unknown }).tools;
+  if (!Array.isArray(tools)) return false;
+  return tools.some((tool) => {
+    if (!tool || typeof tool !== "object") return false;
+    const { type, name } = tool as { type?: unknown; name?: unknown };
+    return (
+      (typeof type === "string" && type.startsWith("code_execution")) || name === "code_execution"
+    );
+  });
+}
 
 const CLAUDE_OAUTH_EXTRA_BETAS = Object.freeze(["fine-grained-tool-streaming-2025-05-14"]);
 
@@ -57,7 +87,7 @@ export const FORWARDABLE_CLIENT_BETAS = Object.freeze([
   "tool-search-tool-2025-10-19",
   "context-1m-2025-08-07",
   "code-execution-2025-08-25",
-  "skills-2025-10-02",
+  ANTHROPIC_SKILLS_BETA,
   // effort-2025-11-24 is a client-negotiated beta (Claude Code sends it on every
   // request). selectBetaFlags no longer force-adds it as a side-effect of the ATU
   // gate (#9505), so a client that sent it must keep it through the merge —
