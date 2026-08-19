@@ -317,20 +317,28 @@ export const DEFAULT_PRICING_FRONTIER = {
       reasoning: 2.19,
       cache_creation: 0.55,
     },
-    // DeepSeek official API list prices, checked 2026-08-13.
+    // DeepSeek official API list prices, checked 2026-08-18. Superseded the
+    // prior 2026-08-13 flat prices below: DeepSeek switched v4-pro/v4-flash to
+    // peak/off-peak dynamic pricing on 2026-08-17 (peak = exactly 2x off-peak;
+    // peak hours 01:00-04:00 and 06:00-10:00 UTC — see
+    // https://api-docs.deepseek.com/quick_start/pricing/). This static table has
+    // no time-of-day dimension, so these are the OFF-PEAK (lower-bound) prices —
+    // a deliberate, documented undercount during the two peak windows, never an
+    // overcount. True peak-awareness would need a time dimension threaded through
+    // getPricingForModel() and every call site; out of scope for this fix.
     "deepseek-v4-pro": {
-      input: 0.435,
-      output: 0.87,
-      cached: 0.003625,
-      reasoning: 0.87,
-      cache_creation: 0.435,
+      input: 0.66,
+      output: 1.98,
+      cached: 0.022,
+      reasoning: 1.98,
+      cache_creation: 0.66,
     },
     "deepseek-v4-flash": {
-      input: 0.14,
-      output: 0.28,
-      cached: 0.0028,
-      reasoning: 0.28,
-      cache_creation: 0.14,
+      input: 0.22,
+      output: 0.66,
+      cached: 0.007,
+      reasoning: 0.66,
+      cache_creation: 0.22,
     },
   },
   blackbox: {
