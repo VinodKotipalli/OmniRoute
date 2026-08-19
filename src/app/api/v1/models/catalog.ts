@@ -68,7 +68,7 @@ import {
   isNoAuthRawProviderPrefix,
   normalizeBlockedProviderSet,
 } from "@/shared/utils/noAuthProviders";
-import { getTokenLimit } from "@omniroute/open-sse/services/contextManager";
+import { getSourcedTokenLimit, getTokenLimit } from "@omniroute/open-sse/services/contextManager";
 import { extractApiKey } from "@/sse/services/auth";
 import type { ComboModelStep } from "@/lib/combos/steps";
 import {
@@ -396,7 +396,10 @@ async function buildUnifiedModelsResponseCore(
     // single-stretch event-loop budget this file's own yield mechanism is meant to protect.
     const connectionsForProviderCache = new Map<string, typeof connections>();
     const getConnectionsForProvider = (...keys: Array<string | null | undefined>) => {
-      const cacheKey = keys.filter((k): k is string => Boolean(k)).sort().join(" ");
+      const cacheKey = keys
+        .filter((k): k is string => Boolean(k))
+        .sort()
+        .join(" ");
       const cached = connectionsForProviderCache.get(cacheKey);
       if (cached) return cached;
       const seen = new Set<string>();
@@ -476,9 +479,11 @@ async function buildUnifiedModelsResponseCore(
       const syncedInputModalities = parseJsonStringArray(synced?.modalities_input);
       const syncedOutputModalities = parseJsonStringArray(synced?.modalities_output);
 
-      const contextLength = isPositiveFiniteNumber(canonical.limits.contextWindow)
-        ? canonical.limits.contextWindow
-        : getTokenLimit(providerId, modelId) || undefined;
+      const contextLength = getSourcedTokenLimit(
+        providerId,
+        modelId,
+        canonical.limits.contextWindow
+      );
       const maxInputTokens = isPositiveFiniteNumber(canonical.limits.maxInputTokens)
         ? canonical.limits.maxInputTokens
         : contextLength;

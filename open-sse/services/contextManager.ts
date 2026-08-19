@@ -282,6 +282,29 @@ export function getTokenLimit(
 }
 
 /**
+ * Context window from a known source only: an explicit canonical window, or a
+ * provider/model-specific `resolveTokenLimit` result. The generic 128000
+ * catch-all (`specific: false`) is treated as unknown so combo `min()` does
+ * not advertise 128k when every real member is larger (#10734).
+ */
+export function getSourcedTokenLimit(
+  provider: string,
+  model: string | null = null,
+  canonicalWindow?: unknown,
+  snapshot?: ModelCapabilityResolutionSnapshot | null
+): number | undefined {
+  if (
+    typeof canonicalWindow === "number" &&
+    Number.isFinite(canonicalWindow) &&
+    canonicalWindow > 0
+  ) {
+    return canonicalWindow;
+  }
+  const resolved = resolveTokenLimit(provider, model, snapshot);
+  return resolved.specific ? resolved.limit : undefined;
+}
+
+/**
  * Resolve a combo target's token limit without crashing when `parseModel(modelStr)`
  * returns `provider: null` (model id with no `provider/` prefix).
  *
@@ -315,7 +338,7 @@ export function getComboTargetTokenLimit(options: {
  * name heuristic, curated per-provider default) or only from the generic
  * catch-all default.
  */
-function resolveTokenLimit(
+export function resolveTokenLimit(
   provider: string,
   model: string | null = null,
   snapshot?: ModelCapabilityResolutionSnapshot | null
