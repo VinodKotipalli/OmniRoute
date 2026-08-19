@@ -23,6 +23,8 @@ test("isFlatRateProvider: dedicated subscription / coding-plan providers are fla
     "qwen-cloud-token-plan",
     "glm",
     "glm-cn",
+    "claude",
+    "cc",
   ]) {
     assert.equal(isFlatRateProvider(id), true, `${id} should be flat-rate`);
   }
@@ -36,7 +38,8 @@ test("isFlatRateProvider: case-insensitive + trimmed", () => {
 test("isFlatRateProvider: metered / cost-tracked providers are NOT flat-rate (no hidden cost)", () => {
   // codex/cx = OmniRoute actively tracks Codex token cost (Fast-tier multipliers,
   // GPT-5.x pricing) and Codex can be a metered account; byteplus = metered ModelArk;
-  // minimax-cn = metered China API; glm-thinking = metered tier.
+  // minimax-cn = metered China API; glm-thinking = metered tier; anthropic = the
+  // metered Anthropic API, distinct from the `claude`/`cc` Claude Code plan.
   for (const id of [
     "openai",
     "anthropic",
@@ -68,6 +71,11 @@ test("computeCostFromPricing: flat-rate provider with flatRateAsZero → $0", ()
     computeCostFromPricing(PRICING, TOKENS, { provider: "minimax", flatRateAsZero: true }),
     0
   );
+  // Claude Code is billed by the Pro/Max subscription, never per token.
+  assert.equal(
+    computeCostFromPricing(PRICING, TOKENS, { provider: "claude", flatRateAsZero: true }),
+    0
+  );
 });
 
 test("computeCostFromPricing: opt-in only — flat-rate provider WITHOUT the flag still estimates", () => {
@@ -83,6 +91,11 @@ test("computeCostFromPricing: metered provider with the flag still estimates", (
   // byteplus is metered despite being a subscription-ish gateway — must NOT be zeroed.
   assert.equal(
     computeCostFromPricing(PRICING, TOKENS, { provider: "byteplus", flatRateAsZero: true }),
+    3
+  );
+  // The metered Anthropic API keeps its real cost — only the Claude Code plan is flat-rate.
+  assert.equal(
+    computeCostFromPricing(PRICING, TOKENS, { provider: "anthropic", flatRateAsZero: true }),
     3
   );
 });
