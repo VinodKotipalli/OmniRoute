@@ -36,6 +36,7 @@ export const PROVIDER_ENDPOINTS = {
   "free-ai": "https://api.free.ai/v1/chat/",
   "void-ai": "https://api.voidai.app/v1/chat/completions",
   helixmind: "https://helixmind.online/v1/chat/completions",
+  tabitoken: "https://tabitoken.com/v1/messages",
   glm: "https://api.z.ai/api/anthropic/v1/messages",
   glmt: "https://api.z.ai/api/anthropic/v1/messages",
   "bailian-coding-plan":

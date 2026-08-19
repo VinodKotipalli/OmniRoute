@@ -442,12 +442,13 @@
     "src/app/(dashboard)/dashboard/providers/[id]/components/modals/AddApiKeyModal.tsx": 1062,
     "src/app/(dashboard)/dashboard/providers/[id]/hooks/useProviderConnections.ts": 1051,
     "src/shared/components/ModelSelectModal.tsx": 1138,
-    "src/shared/constants/providers/apikey/gateways.ts": 1255,
+    "src/shared/constants/providers/apikey/gateways.ts": 1270,
     "open-sse/vendor/codex-chatgpt-web/bridge.ts": 1387,
     "_rebaseline_2026_08_11_v3850_merge_storm_provider_registry": "DRIFT do merge-storm 2026-08-11 (99 PRs mergeados no release/v3.8.50). AddApiKeyModal.tsx (PR #8949 ChatGPT Web provider) e useProviderConnections.ts/ModelSelectModal.tsx (PRs #9011 combo test-all, #9499 image combos) = UI nova legitima acima do cap; gateways.ts = god-file de catalogo de providers que cresceu com PRs #9009/#9421/#9468/#9594 (qualquer split arriscaria corromper o merge de novo — o proprio PR #9421 quebrou o arquivo); bridge.ts (PR #8949) = ponte Chromium vendored; proxyFetch.ts 1207->1220 = drift herdado de merges. Owner autorizou rebaseline com anotacao (2026-08-11).",
     "src/lib/modelCapabilities.ts": 1006,
     "src/app/(dashboard)/dashboard/providers/[id]/providerPageHelpers.ts": 1014,
-    "open-sse/config/imageRegistry.ts": 1019
+    "open-sse/config/imageRegistry.ts": 1019,
+    "_rebaseline_2026_08_19_10668_tabitoken_gateway": "#10668 (yawar-aquil) own catalog growth: src/shared/constants/providers/apikey/gateways.ts 1255->1270 (+15, entirely this PR diff -- one new tabitoken gateway entry, data lines only). Not combination drift: reproducible on the PR branch alone, so the WS5.5 release-captain rule does not apply. Extraction is not available -- the file is pure data (own header: \"Pure data; merged by apikey/index.ts via spread\") and already split into 6 family files under apikey/. Same precedent as _rebaseline_2026_08_14_imagetotext_servicekinds (#10275/#10291, gateways.ts 1250->1255, data lines only) and _rebaseline_2026_08_11_v3850_merge_storm_provider_registry (owner-authorized for this same file)."
   },
   "_rebaseline_base_2026_08_10_proxyfetch": "Base-red fix (green-prs sweep, issue #9985): open-sse/utils/proxyFetch.ts 1207 > cap 1000 — new proxied-TLS fetch helper introduced by the Fal reference-image work. Owner-authorized quick rebaseline to green; structural slim tracked for v3.9.0.",
   "_rebaseline_2026_07_27_v3849_train2": "Merge-train 2 (7 PRs) — owner-approved 2026-07-27. Single entry: chatCore.ts 4955->5006 (#8595, Responses multi-turn image compaction before the context hard-reject). Genuine irreducible growth at the existing compaction chokepoint in handleChatCore — the PR adds a last-resort retry against the concrete budget plus the estimateFinalInputTokens helper, both wired at the pre-existing call site rather than a new branch. Covered by tests/unit/8560-responses-image-compaction.test.ts (4 tests).",

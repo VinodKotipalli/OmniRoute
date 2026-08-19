@@ -5368,6 +5368,32 @@
       "stream": "https://t3.chat/api/chat"
     }
   },
+  "tabitoken": {
+    "format": "claude",
+    "headers": {
+      "apiKey": {
+        "Accept": "text/event-stream",
+        "Anthropic-Version": "2023-06-01",
+        "Content-Type": "application/json",
+        "x-api-key": "<CRED>"
+      },
+      "nonStream": {
+        "Anthropic-Version": "2023-06-01",
+        "Content-Type": "application/json",
+        "x-api-key": "<CRED>"
+      },
+      "oauth": {
+        "Accept": "text/event-stream",
+        "Anthropic-Version": "2023-06-01",
+        "Content-Type": "application/json",
+        "x-api-key": "<CRED>"
+      }
+    },
+    "url": {
+      "nonStream": "https://tabitoken.com/v1/messages",
+      "stream": "https://tabitoken.com/v1/messages"
+    }
+  },
   "tencent": {
     "format": "openai",
     "headers": {

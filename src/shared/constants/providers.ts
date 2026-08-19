@@ -146,6 +146,7 @@ export const AGGREGATOR_PROVIDER_IDS = new Set([
   "free-ai",
   "void-ai",
   "helixmind",
+  "tabitoken",
 
 ]);;
 

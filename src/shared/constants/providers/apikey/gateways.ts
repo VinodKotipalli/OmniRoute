@@ -1251,4 +1251,19 @@ export const APIKEY_PROVIDERS_GATEWAYS = {
     apiHint:
       "Create a helix- key and use https://helixmind.online/v1. OpenAI requests use Bearer authentication; the Anthropic-compatible messages endpoint accepts x-api-key.",
   },
+  // TabiToken (https://tabitoken.com) — NewAPI-based Claude gateway. Its public pricing
+  // endpoint lists a Claude-only catalog (Opus 5 / 4.8, each with a -thinking variant),
+  // every model accepting the Anthropic and OpenAI protocols.
+  tabitoken: {
+    id: "tabitoken",
+    alias: "tabitoken",
+    name: "TabiToken",
+    icon: "hub",
+    color: "#F97316",
+    textIcon: "TT",
+    passthroughModels: true,
+    website: "https://tabitoken.com",
+    apiHint:
+      "Create an sk- key at https://tabitoken.com and use https://tabitoken.com. The Anthropic-compatible /v1/messages endpoint (default) takes x-api-key; /v1/chat/completions takes Bearer.",
+  },
 };
