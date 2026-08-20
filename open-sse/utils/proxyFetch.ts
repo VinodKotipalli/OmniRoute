@@ -19,6 +19,11 @@ import {
   isControlPlaneProxyDirectFallbackEnabled,
   isFeatureFlagEnabled,
 } from "@/shared/utils/featureFlags";
+import {
+  directFetchWithBoundedResponseStart,
+  isDirectResponseStartTimeout,
+  resolveDirectHeadersTimeoutMs,
+} from "./directResponseStartTimeout.ts";
 
 // #9100: relay egress (Vercel / Deno / Cloudflare edge functions) used to go
 // through bare `originalFetch` — NO connection pooling, NO timeout, NO retry.
@@ -154,7 +159,6 @@ type TlsFingerprintStore = {
   provider?: string | null;
   sessionScope?: string;
 };
-
 /**
  * #5217 (Gap-secondary): a mutable sink that records the proxy actually applied
  * by `runWithProxyContext` for the in-flight request. Executors that pin their
@@ -802,15 +806,7 @@ async function patchedFetch(
         (deps.nativeFetch as FetchWithDispatcher | undefined) ?? originalFetchWithDispatcher;
       return _nativeFetch(input, options);
     }
-    // Direct connection (no proxy) — use undici with custom dispatcher for timeout control.
-    // Falls back to original native fetch if dispatcher initialization fails (#1054).
-    // Retries once on transient dispatcher errors before falling back (fix: proxyfetch-undici-retry).
-    //
-    // Non-replayable body guard: if the body is stream-like (ReadableStream/Blob)
-    // or the input is a Request that carries a body, the first dispatcher attempt
-    // owns that body. Retrying or falling back to native fetch would replay a
-    // consumed/locked body and can mask the original transport error with
-    // "Response body object should not be disturbed or locked".
+    // Direct undici path: bound response-start, fresh-socket retry, and body guard.
     const hasNonReplayableBody = requestHasNonReplayableBody(input, options);
     const maxAttempts = hasNonReplayableBody ? 1 : 2;
     const _undiciDirect =
@@ -818,32 +814,44 @@ async function patchedFetch(
     const _nativeFallback =
       (deps.nativeFetch as FetchWithDispatcher | undefined) ?? originalFetchWithDispatcher;
     let lastDispatcherError: unknown = null;
+    const directHeadersTimeoutMs = resolveDirectHeadersTimeoutMs();
+    let targetHostForLogs = "";
+    try {
+      targetHostForLogs = new URL(targetUrl).host;
+    } catch {
+      // ignore — logging is best-effort
+    }
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        return await _undiciDirect(input, {
-          ...options,
-          // #4252: first attempt uses the pooled keep-alive dispatcher; a retry
-          // (after a transient socket error) uses the no-keep-alive dispatcher so
-          // it opens a FRESH socket instead of grabbing another stale pooled one
-          // — the burst pattern was the retry re-hitting a dead pooled socket and
-          // then falling through to native fetch (which also pools) → 502.
-          dispatcher: attempt === 0 ? getDefaultDispatcher() : getRetryDispatcher(),
-        });
+        return await directFetchWithBoundedResponseStart(
+          input,
+          {
+            ...options,
+            dispatcher: attempt === 0 ? getDefaultDispatcher() : getRetryDispatcher(),
+          },
+          _undiciDirect,
+          directHeadersTimeoutMs
+        );
       } catch (dispatcherError) {
+        if (isDirectResponseStartTimeout(dispatcherError)) {
+          if (attempt === 0 && maxAttempts > 1) {
+            console.warn(
+              `[ProxyFetch] Direct response-start timeout (${directHeadersTimeoutMs}ms) on pooled dispatcher — retrying on fresh no-keep-alive dispatcher: ${targetHostForLogs}`
+            );
+            lastDispatcherError = dispatcherError;
+            continue;
+          }
+          throw dispatcherError;
+        }
         const msg =
           dispatcherError instanceof Error ? dispatcherError.message : String(dispatcherError);
-        // CAUTION: Do NOT fallback to native fetch if the error is a version mismatch (invalid onRequestStart)
-        // because the native fetch will definitely fail with the undici v8 dispatcher.
         if (msg.includes("onRequestStart")) {
           console.error(
             `[ProxyFetch] Fatal version mismatch: Dispatcher (v8) vs Fetch (v6/native). Hardware upgrade or SOCKS5 config isolation required. Error: ${msg}`
           );
           throw dispatcherError;
         }
-        // Only retry/fallback for connection/dispatcher errors, not HTTP errors.
-        // Prefer the .code property when available (more stable across undici
-        // versions than message-string matching); fall back to substring match
-        // for errors that lack a structured code.
+        // Retry/fallback only for connection errors, never HTTP errors.
         tagProxyUnreachable(dispatcherError);
         const errCode = (dispatcherError as { code?: unknown })?.code;
         if (
@@ -854,10 +862,7 @@ async function patchedFetch(
           msg.includes("UND_ERR")
         ) {
           if (attempt === 0 && maxAttempts > 1) {
-            // First failure — retry once after a short backoff before giving up.
-            // Delay is OMNIROUTE_RETRY_BACKOFF_MS (default 10ms): a fixed backoff
-            // beats random jitter here because the retry opens a fresh socket, so
-            // jitter was pure added latency with no herd benefit.
+            // Retry after a short fixed backoff on a fresh socket.
             lastDispatcherError = dispatcherError;
             await new Promise((r) => setTimeout(r, RETRY_BACKOFF_MS));
             continue;
@@ -873,7 +878,7 @@ async function patchedFetch(
             throw tagProxyUnreachable(dispatcherError);
           }
 
-          // All attempts exhausted — try proxy fallback before native fetch
+          // Exhausted attempts: try proxy fallback before native fetch.
           if (
             !tlsDirectFallback &&
             source === "direct" &&
@@ -899,20 +904,14 @@ async function patchedFetch(
               }
             }
           }
-          // Preserve original phrase intact for monitoring: "Undici dispatcher failed, falling back to native fetch"
-          // #4252: append the flattened err.cause (code/syscall/errno/address) — the bare
-          // "fetch failed" message hides what actually broke, making bursts undiagnosable.
+          // Preserve the original monitoring phrase and append the transport cause.
           console.warn(
             `[ProxyFetch] Undici dispatcher failed, falling back to native fetch (after retry): ${describeFetchCause(dispatcherError)}`
           );
           try {
             return await _nativeFallback(input, options);
           } catch (nativeError) {
-            // #4252: both the undici dispatcher AND native fetch failed. Surface BOTH
-            // causes (server log) and tag the propagated error so the combo executor sees
-            // a diagnosable failure IMMEDIATELY instead of a bare "fetch failed" — the
-            // latter left jobs sitting until the 30s semaphore queue timeout, which then
-            // tripped the circuit breaker.
+            // Surface both dispatcher and native causes immediately.
             const detail = `dispatcher=[${describeFetchCause(dispatcherError)}] native=[${describeFetchCause(nativeError)}]`;
             console.warn(`[ProxyFetch] native fetch fallback ALSO failed: ${detail}`);
             if (nativeError instanceof Error) {
