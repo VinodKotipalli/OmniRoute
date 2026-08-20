@@ -5,6 +5,7 @@ import { requireManagementAuth } from "@/lib/api/requireManagementAuth";
 import { createProxyDispatcher, proxyConfigToUrl } from "@omniroute/open-sse/utils/proxyDispatcher";
 import { fetch as undiciFetch } from "undici";
 import { resolveHealthCheckStatusWrite } from "@/lib/proxyHealth/statusPolicy";
+import { resolveProviderProbeTarget } from "@/lib/proxyHealth/providerProbeTarget";
 import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 import { createErrorResponse } from "@/lib/api/errorResponse";
 
@@ -54,13 +55,18 @@ async function testSingleProxy(proxy: {
     };
   }
   const start = Date.now();
+  // Same rationale as the background sweep: a real provider's models endpoint is GET-only,
+  // unlike httpbin.org/ip. The generic target keeps its existing HEAD.
+  const providerTarget = await resolveProviderProbeTarget(proxy.id);
+  const target = providerTarget ?? TEST_URL;
+  const method = providerTarget ? "GET" : "HEAD";
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TEST_TIMEOUT_MS);
 
   try {
     const dispatcher = createProxyDispatcher(proxyUrl);
-    const resp = await undiciFetch(TEST_URL, {
-      method: "HEAD",
+    const resp = await undiciFetch(target, {
+      method,
       signal: controller.signal,
       dispatcher,
       headers: { "User-Agent": "OmniRoute/1.0" },

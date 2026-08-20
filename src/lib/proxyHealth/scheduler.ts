@@ -30,6 +30,7 @@ import {
 } from "@omniroute/open-sse/utils/proxyDispatcher";
 import { fetch as undiciFetch } from "undici";
 import { decideProxyHealthAction, type ProxyProbeOutcome } from "./decision.ts";
+import { resolveProviderProbeTarget } from "./providerProbeTarget.ts";
 
 // #6246: a HEAD to the public probe target through a legit (often loaded) proxy
 // can exceed a few seconds; the old 5s ceiling produced false negatives that
@@ -114,12 +115,18 @@ async function testOneProxy(proxy: {
     proxyUrl = null;
   }
   if (!proxyUrl) return "fail";
+  // A provider's models endpoint is a real GET-only API surface, unlike httpbin.org/ip: many
+  // reject HEAD outright. HEAD stays the default for the generic target — this changes nothing
+  // for a proxy with no eligible provider assignment.
+  const providerTarget = await resolveProviderProbeTarget(proxy.id);
+  const target = providerTarget ?? TEST_URL;
+  const method = providerTarget ? "GET" : "HEAD";
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TEST_TIMEOUT_MS);
   try {
     const dispatcher = createProxyDispatcher(proxyUrl);
-    const resp = await undiciFetch(TEST_URL, {
-      method: "HEAD",
+    const resp = await undiciFetch(target, {
+      method,
       signal: controller.signal,
       dispatcher,
       headers: { "User-Agent": "OmniRoute/1.0" },
@@ -129,8 +136,13 @@ async function testOneProxy(proxy: {
     return resp.status < 500 ? "ok" : "inconclusive";
   } catch {
     // Our own deadline elapsed → inconclusive (slow, not necessarily dead).
-    // Any other error is a genuine proxy-level connection failure.
-    return controller.signal.aborted ? "inconclusive" : "fail";
+    if (controller.signal.aborted) return "inconclusive";
+    // A provider-resolved target's connection health is not proven the way the
+    // operator-configured generic target is: a registry baseUrl can be a placeholder that
+    // never resolves for anyone (e.g. databricks's default azuredatabricks.net host is
+    // literally 16 zeros). A connection failure there says nothing about this proxy —
+    // same principle as the 5xx case above, extended to connection-level errors.
+    return providerTarget ? "inconclusive" : "fail";
   } finally {
     clearTimeout(timeout);
   }
