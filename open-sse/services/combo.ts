@@ -87,7 +87,7 @@ import { selectQuotaShareTarget } from "./combo/quotaShareStrategy.ts";
 import { makeConnectionConcurrencyResolver, lookupPositiveCap } from "./combo/concurrencyCaps.ts";
 import { acquireQuotaShareConcurrencySlot } from "./combo/quotaShareConcurrency.ts";
 import { canAffordRequest } from "../../src/lib/quota/quotaScheduler.ts";
-import { getCachedProviderConnectionById } from "../../src/lib/localDb.ts";
+import { getCachedProviderConnectionById } from "../../src/lib/db/readCache.ts";
 import { orderTargetsByEvalScores } from "./evalRouting.ts";
 
 /**
@@ -96,11 +96,13 @@ import { orderTargetsByEvalScores } from "./evalRouting.ts";
  * keeps the previously recorded limit (or 0 for a fresh row, meaning "no
  * budget enforced").
  */
-function resolveTargetTokenLimit(target: { connectionId?: string | null }): number | undefined {
+async function resolveTargetTokenLimit(target: {
+  connectionId?: string | null;
+}): Promise<number | undefined> {
   const connectionId = target?.connectionId;
   if (!connectionId) return undefined;
   try {
-    const connection = getCachedProviderConnectionById(connectionId);
+    const connection = await getCachedProviderConnectionById(connectionId);
     const overrides = (connection as { rateLimitOverrides?: Record<string, number> | null } | null)
       ?.rateLimitOverrides;
     const tpm = overrides?.tpm;
@@ -3005,7 +3007,7 @@ async function handleRoundRobinCombo({
           try {
             const { reserveQuota } = await import("../../src/lib/quota/quotaScheduler.ts");
             reserveQuota(target.connectionId, modelStr, attemptBody as Record<string, unknown>, {
-              tokenLimit: resolveTargetTokenLimit(target),
+              tokenLimit: await resolveTargetTokenLimit(target),
             });
           } catch {
             // best-effort only
