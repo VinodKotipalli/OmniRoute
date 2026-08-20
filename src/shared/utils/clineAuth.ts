@@ -8,8 +8,6 @@
  * must route its headers through `buildClineHeaders()`.
  */
 
-import { randomUUID } from "node:crypto";
-
 import { APP_CONFIG } from "../constants/appConfig";
 
 const APP_VERSION = APP_CONFIG.version;
@@ -39,24 +37,23 @@ function getHeaderCaseInsensitive(
   return key ? cleanHeaderValue(headers?.[key]) : undefined;
 }
 
-/** Keep an inbound Cline task id when supplied; otherwise create one per request. */
-export function resolveClineTaskId(clientHeaders?: Record<string, string> | null): string {
-  return getHeaderCaseInsensitive(clientHeaders, "x-task-id") ?? randomUUID();
+/** Keep an inbound Cline task id when supplied; never invent task identity at the proxy layer. */
+export function resolveClineTaskId(
+  clientHeaders?: Record<string, string> | null
+): string | undefined {
+  return getHeaderCaseInsensitive(clientHeaders, "x-task-id");
 }
 
 /**
- * Apply the required Cline billing headers with case-insensitive replacement.
- * These fields are authoritative in the official client and must win over
- * stored/configured header layers.
+ * Apply Cline billing headers with case-insensitive replacement. Task identity
+ * is optional and may only come from the request context; stored/configured
+ * header layers must not fabricate or override it.
  */
 export function applyClineProtocolHeaders(
   headers: Record<string, string>,
   context: ClineHeaderContext = {}
 ): Record<string, string> {
-  const taskId =
-    cleanHeaderValue(context.taskId) ??
-    getHeaderCaseInsensitive(headers, "x-task-id") ??
-    randomUUID();
+  const taskId = cleanHeaderValue(context.taskId);
   const clientVersion = cleanHeaderValue(context.clientVersion) ?? APP_VERSION;
   const required: Record<string, string> = {
     "HTTP-Referer": "https://cline.bot",
@@ -68,8 +65,12 @@ export function applyClineProtocolHeaders(
     "X-PLATFORM": cleanHeaderValue(context.platform) ?? process.platform ?? "unknown",
     "X-PLATFORM-VERSION": cleanHeaderValue(context.platformVersion) ?? process.version ?? "unknown",
     "X-CORE-VERSION": cleanHeaderValue(context.coreVersion) ?? APP_VERSION,
-    "X-Task-ID": taskId,
   };
+
+  for (const existing of Object.keys(headers)) {
+    if (existing.toLowerCase() === "x-task-id") delete headers[existing];
+  }
+  if (taskId) required["X-Task-ID"] = taskId;
 
   for (const [name, value] of Object.entries(required)) {
     for (const existing of Object.keys(headers)) {
@@ -159,7 +160,8 @@ export function applyClineAuthHeaders(
   clientHeaders: Record<string, string> | null | undefined,
   isClinepass: boolean
 ): Record<string, string> {
-  const context: ClineHeaderContext = { taskId: resolveClineTaskId(clientHeaders) };
+  const taskId = resolveClineTaskId(clientHeaders);
+  const context: ClineHeaderContext = taskId ? { taskId } : {};
   const built = isClinepass
     ? buildClinepassHeaders(credentials, effectiveKey, context)
     : buildClineHeaders(effectiveKey || credentials?.accessToken, {}, context);
