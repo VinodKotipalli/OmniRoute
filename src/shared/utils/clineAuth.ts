@@ -13,6 +13,8 @@ import { randomUUID } from "node:crypto";
 import { APP_CONFIG } from "../constants/appConfig";
 
 const APP_VERSION = APP_CONFIG.version;
+const DEFAULT_CLINE_CLIENT_TYPE = "omniroute";
+const INTERNAL_HEALTH_CHECK_CLIENT_TYPE = "omniroute-internal-health-check";
 
 export interface ClineHeaderContext {
   taskId?: string;
@@ -44,6 +46,12 @@ export function resolveClineTaskId(clientHeaders?: Record<string, string> | null
   return getHeaderCaseInsensitive(clientHeaders, "x-task-id") ?? randomUUID();
 }
 
+function resolveClineClientType(clientHeaders?: Record<string, string> | null): string | undefined {
+  return getHeaderCaseInsensitive(clientHeaders, "x-internal-test") === "combo-health-check"
+    ? INTERNAL_HEALTH_CHECK_CLIENT_TYPE
+    : undefined;
+}
+
 /**
  * Apply the required Cline billing headers with case-insensitive replacement.
  * These fields are authoritative in the official client and must win over
@@ -58,12 +66,18 @@ export function applyClineProtocolHeaders(
     getHeaderCaseInsensitive(headers, "x-task-id") ??
     randomUUID();
   const clientVersion = cleanHeaderValue(context.clientVersion) ?? APP_VERSION;
+  const existingClientType = getHeaderCaseInsensitive(headers, "x-client-type");
+  const clientType =
+    cleanHeaderValue(context.clientType) ??
+    (existingClientType === INTERNAL_HEALTH_CHECK_CLIENT_TYPE
+      ? INTERNAL_HEALTH_CHECK_CLIENT_TYPE
+      : DEFAULT_CLINE_CLIENT_TYPE);
   const required: Record<string, string> = {
     "HTTP-Referer": "https://cline.bot",
     "X-Title": "Cline",
     "User-Agent": `Cline/${clientVersion}`,
     "X-IS-MULTIROOT": context.isMultiRoot === true ? "true" : "false",
-    "X-CLIENT-TYPE": cleanHeaderValue(context.clientType) ?? "omniroute",
+    "X-CLIENT-TYPE": clientType,
     "X-CLIENT-VERSION": clientVersion,
     "X-PLATFORM": cleanHeaderValue(context.platform) ?? process.platform ?? "unknown",
     "X-PLATFORM-VERSION": cleanHeaderValue(context.platformVersion) ?? process.version ?? "unknown",
@@ -159,7 +173,10 @@ export function applyClineAuthHeaders(
   clientHeaders: Record<string, string> | null | undefined,
   isClinepass: boolean
 ): Record<string, string> {
-  const context: ClineHeaderContext = { taskId: resolveClineTaskId(clientHeaders) };
+  const context: ClineHeaderContext = {
+    taskId: resolveClineTaskId(clientHeaders),
+    clientType: resolveClineClientType(clientHeaders),
+  };
   const built = isClinepass
     ? buildClinepassHeaders(credentials, effectiveKey, context)
     : buildClineHeaders(effectiveKey || credentials?.accessToken, {}, context);

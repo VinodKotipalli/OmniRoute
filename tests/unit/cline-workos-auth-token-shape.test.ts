@@ -110,3 +110,16 @@ test("DefaultExecutor.buildHeaders uses the cline workos auth token shape", () =
   assert.equal(headers["X-Title"], "Cline");
   assert.equal(headers["X-Task-ID"], "task-from-client");
 });
+
+test("DefaultExecutor labels internal health checks separately from user traffic", () => {
+  const executor = new DefaultExecutor("cline");
+  const headers = executor.buildHeaders({ apiKey: "tok-abc" }, true, {
+    "X-Internal-Test": "combo-health-check",
+  });
+
+  assert.equal(headers["X-CLIENT-TYPE"], "omniroute-internal-health-check");
+
+  // BaseExecutor reapplies the required protocol headers immediately before dispatch.
+  applyClineProtocolHeaders(headers, { taskId: headers["X-Task-ID"] });
+  assert.equal(headers["X-CLIENT-TYPE"], "omniroute-internal-health-check");
+});
