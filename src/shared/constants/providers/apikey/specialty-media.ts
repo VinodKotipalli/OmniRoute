@@ -305,4 +305,19 @@ export const APIKEY_PROVIDERS_SPECIALTY = {
     apiHint:
       "DeepAI uses per-endpoint REST calls (e.g. /api/text2img) instead of OpenAI chat/completions. OmniRoute adapts OpenAI image generation requests to DeepAI's /api/{slug} endpoints.",
   },
+  "cursor-api": {
+    id: "cursor-api",
+    alias: "cua",
+    name: "Cursor API",
+    icon: "edit_note",
+    color: "#00D4AA",
+    textIcon: "CA",
+    website: "https://cursor.com/dashboard/api",
+    subscriptionRisk: true,
+    riskNoticeVariant: "oauth",
+    authHint:
+      "Paste a Cursor user API key (crsr_...) from cursor.com/dashboard/api. OmniRoute exchanges it for a session token on demand; no IDE or cursor-agent install is needed. Usage bills to the Cursor plan that owns the key.",
+    apiHint:
+      "Same agent protocol and model catalog as the Cursor IDE provider. The Cursor CLI can also be pointed at /api/cursor-cli on this instance and authenticated with an OmniRoute API key.",
+  },
 };

@@ -156,3 +156,29 @@ export const cursorProvider: RegistryEntry = {
     { id: "kimi-k2.7-code", name: "Kimi K2.7 Code" },
   ],
 };
+
+/**
+ * API-key variant of the Cursor provider.
+ *
+ * Same wire protocol, executor and catalog as `cursor`, but the connection
+ * holds a Cursor user API key (`crsr_…`, cursor.com/dashboard/api) instead of
+ * an IDE/OAuth session. The executor exchanges that key for a session token
+ * on demand (open-sse/services/cursorApiKeyAuth.ts), so no cursor-agent or
+ * IDE install is needed on the OmniRoute host. Kept as a distinct backend ID
+ * so API-key and IDE-session connections never share renewal, quota or
+ * dashboard semantics.
+ */
+export const cursor_apiProvider: RegistryEntry = {
+  id: "cursor-api",
+  alias: "cua",
+  format: cursorProvider.format,
+  executor: "cursor-api",
+  baseUrl: cursorProvider.baseUrl,
+  chatPath: cursorProvider.chatPath,
+  authType: "apikey",
+  authHeader: "bearer",
+  defaultContextLength: cursorProvider.defaultContextLength,
+  headers: getCursorRegistryHeaders(),
+  clientVersion: CURSOR_REGISTRY_VERSION,
+  models: cursorProvider.models,
+};

@@ -61,6 +61,28 @@ export async function validateAuggieProvider() {
   return { valid: true, error: null, unsupported: false, method: result.version };
 }
 
+export async function validateCursorApiProvider({ apiKey }: { apiKey?: string }) {
+  const { exchangeCursorApiKey, CursorApiKeyExchangeError, isCursorApiKey } =
+    await import("@omniroute/open-sse/services/cursorApiKeyAuth.ts");
+  const key = (apiKey || "").trim();
+  if (!isCursorApiKey(key)) {
+    return {
+      valid: false,
+      error: "Cursor user API keys start with crsr_ (cursor.com/dashboard/api)",
+      unsupported: false,
+      statusCode: 400,
+    };
+  }
+  try {
+    await exchangeCursorApiKey(key);
+    return { valid: true, error: null, unsupported: false, method: "exchange_user_api_key" };
+  } catch (error) {
+    const statusCode = error instanceof CursorApiKeyExchangeError ? error.status : 502;
+    const message = error instanceof Error ? error.message : "Cursor API key exchange failed";
+    return { valid: false, error: message, unsupported: false, statusCode };
+  }
+}
+
 export async function validateQoderProvider({ apiKey, providerSpecificData }: any) {
   // Bifurcate validation: PAT tokens use Cosy auth against api1.qoder.sh;
   // regular API keys validate against dashscope (OpenAI-compatible endpoint).

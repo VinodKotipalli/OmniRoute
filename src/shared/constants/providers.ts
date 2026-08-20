@@ -146,8 +146,7 @@ export const AGGREGATOR_PROVIDER_IDS = new Set([
   "free-ai",
   "void-ai",
   "helixmind",
-
-]);;
+]);
 
 export const ENTERPRISE_CLOUD_PROVIDER_IDS = new Set([
   "azure-openai",

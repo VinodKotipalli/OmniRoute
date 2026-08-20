@@ -30,6 +30,12 @@ const PUBLIC_API_ROUTE_PREFIXES = [
   // auth (503 when TELEGRAM_BOT_TOKEN is unset; 401 on invalid initData
   // HMAC). See src/app/api/telegram/update/route.ts. Do not widen.
   "/api/telegram/",
+  // Cursor CLI passthrough (CURSOR_API_ENDPOINT -> OmniRoute -> api2.cursor.sh).
+  // The handler enforces its own auth: /auth/exchange_user_api_key requires an
+  // OmniRoute API key (validateApiKey); every other path requires the
+  // OmniRoute-minted session JWT that exchange returns. See
+  // open-sse/handlers/cursorCliProxy.ts. Do not widen.
+  "/api/cursor-cli/",
 ];
 
 const PUBLIC_READONLY_API_ROUTE_PREFIXES = [

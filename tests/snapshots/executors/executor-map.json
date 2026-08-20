@@ -190,10 +190,20 @@
       "configSource": "cursor",
       "provider": "cursor"
     },
+    "cua": {
+      "className": "CursorExecutor",
+      "configSource": "cursor-api",
+      "provider": "cursor-api"
+    },
     "cursor": {
       "className": "CursorExecutor",
       "configSource": "cursor",
       "provider": "cursor"
+    },
+    "cursor-api": {
+      "className": "CursorExecutor",
+      "configSource": "cursor-api",
+      "provider": "cursor-api"
     },
     "cw-web": {
       "className": "ClaudeWebExecutor",
@@ -686,6 +696,6 @@
       "provider": "zai-web"
     }
   },
-  "keyCount": 137,
+  "keyCount": 139,
   "sharedInstances": []
 }

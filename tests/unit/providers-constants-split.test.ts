@@ -21,7 +21,8 @@
 // Raycast Pro #8895), then later additions to 199; retiring GitHub Models brings it to 198.
 // The v3.8.50 free-tier gateway waves (#9631 registry cycle, waves 2-5, #9210 phase 3) grew the
 // gateways family to 228 measured on the tip; Puter retired (#10210) and chatanywhere restored
-// (base-reds round 3, #9985) are both included in that measurement.
+// (base-reds round 3, #9985) are both included in that measurement; Cursor API (specialty-media,
+// #10729) brings it to 229.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
@@ -50,12 +51,12 @@ test("barrel still exports every catalog + key helpers", () => {
   }
 });
 
-test("APIKEY_PROVIDERS merges the 6 family files into 228 entries (no loss / no dup)", async () => {
+test("APIKEY_PROVIDERS merges the 6 family files into 229 entries (no loss / no dup)", async () => {
   const keys = Object.keys((P as Record<string, object>).APIKEY_PROVIDERS);
-  assert.equal(keys.length, 228);
-  assert.equal(new Set(keys).size, 228, "duplicate keys after spread-merge");
+  assert.equal(keys.length, 229);
+  assert.equal(new Set(keys).size, 229, "duplicate keys after spread-merge");
   // the merged object's entry-count equals the sum of the 6 semantic family files; families are a
-  // strict partition (every provider in exactly one), so the sum must be exactly 228.
+  // strict partition (every provider in exactly one), so the sum must be exactly 229.
   const families: [string, string][] = [
     ["gateways", "APIKEY_PROVIDERS_GATEWAYS"],
     ["frontier-labs", "APIKEY_PROVIDERS_FRONTIER"],
@@ -75,7 +76,7 @@ test("APIKEY_PROVIDERS merges the 6 family files into 228 entries (no loss / no 
       seen.add(k);
     }
   }
-  assert.equal(famTotal, 228, "families must partition all 228 providers");
+  assert.equal(famTotal, 229, "families must partition all 229 providers");
 });
 
 test("AI_PROVIDERS Proxy aggregates all sections; lookups resolve", () => {
