@@ -326,6 +326,7 @@ const ENV_VAR_DENYLIST = new Set([
   "AUTHZ_NOT_INITIALIZED", // AuthzAssertionError code (AUTHZ_GUIDE.md)
   "MODULE_NOT_FOUND", // Node runtime error code watched by service supervisor (ELECTRON_GUIDE.md)
   "ERR_DLOPEN_FAILED", // Node native-module load error code (ELECTRON_GUIDE.md)
+  "SQLITE_FULL", // SQLite result code returned when the disk is full (DATABASE_GUIDE.md)
   // ── Code-symbol / naming-convention examples documented in prose ─────────────
   "UPPER_SNAKE", // the literal naming-convention token in the style guide (CODEBASE_DOCUMENTATION.md)
   "DEFAULT_TIMEOUT", // example constant name in the UPPER_SNAKE convention row (AGENTS.md)
