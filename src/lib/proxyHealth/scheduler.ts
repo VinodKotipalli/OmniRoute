@@ -29,7 +29,11 @@ import {
   proxyConfigToUrl,
 } from "@omniroute/open-sse/utils/proxyDispatcher";
 import { fetch as undiciFetch } from "undici";
-import { decideProxyHealthAction, type ProxyProbeOutcome } from "./decision.ts";
+import {
+  classifyProbeStatus,
+  decideProxyHealthAction,
+  type ProxyProbeOutcome,
+} from "./decision.ts";
 
 // #6246: a HEAD to the public probe target through a legit (often loaded) proxy
 // can exceed a few seconds; the old 5s ceiling produced false negatives that
@@ -90,9 +94,12 @@ function isBackgroundServicesDisabled(): boolean {
 }
 
 /**
- * Reachability probe for one proxy, classified into a tri-state so the pure
+ * Reachability probe for one proxy, classified so the pure
  * decision layer can apply the #6246 policy:
- *   - "ok"           — the proxy relayed and the target answered (<500).
+ *   - "ok"           — the proxy relayed and the target served the request.
+ *   - "blocked"      — the proxy relayed, but the TARGET refused this egress IP
+ *                      (401/403/429). Neutral like "inconclusive": the proxy is
+ *                      not at fault, yet it is not serving that destination.
  *   - "inconclusive" — NOT the proxy's fault: our own timeout/abort, or the probe
  *                      TARGET returned a 5xx (the proxy connected fine). Never
  *                      penalizes the proxy.
@@ -124,9 +131,7 @@ async function testOneProxy(proxy: {
       dispatcher,
       headers: { "User-Agent": "OmniRoute/1.0" },
     });
-    // A 5xx from the probe target means the proxy DID relay — the target is at
-    // fault, not the proxy. Do not penalize the proxy for that.
-    return resp.status < 500 ? "ok" : "inconclusive";
+    return classifyProbeStatus(resp.status);
   } catch {
     // Our own deadline elapsed → inconclusive (slow, not necessarily dead).
     // Any other error is a genuine proxy-level connection failure.
@@ -148,6 +153,7 @@ async function sweep(): Promise<void> {
   let tested = 0;
   let alive = 0;
   let inconclusive = 0;
+  let blocked = 0;
   let removed = 0;
   let disabled = 0;
 
@@ -166,6 +172,7 @@ async function sweep(): Promise<void> {
       tested++;
       if (outcome === "ok") alive++;
       else if (outcome === "inconclusive") inconclusive++;
+      else if (outcome === "blocked") blocked++;
 
       const decision = decideProxyHealthAction({
         outcome,
@@ -202,8 +209,8 @@ async function sweep(): Promise<void> {
   }
 
   console.log(
-    `${LOG_PREFIX} Sweep complete: ${tested} tested, ${alive} alive, ${inconclusive} inconclusive, ` +
-      `${removed} auto-removed, ${disabled} auto-disabled`
+    `${LOG_PREFIX} Sweep complete: ${tested} tested, ${alive} alive, ${blocked} blocked by target, ` +
+      `${inconclusive} inconclusive, ${removed} auto-removed, ${disabled} auto-disabled`
   );
 }
 
