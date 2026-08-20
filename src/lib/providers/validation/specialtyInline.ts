@@ -201,6 +201,19 @@ export async function validateLongcatProvider({ apiKey, providerSpecificData, is
   }
 }
 
+export function normalizeNvidiaValidationFailure(error: unknown) {
+  const failure = toValidationErrorResult(error);
+  if (failure.timeout) {
+    return {
+      valid: true,
+      error: null,
+      warning: "NVIDIA auth probe timed out; credential validity is inconclusive",
+      method: "chat_probe_inconclusive",
+    };
+  }
+  return failure;
+}
+
 // NVIDIA NIM (#2463) — bypass the /models probe in favor of a direct
 // chat/completions probe. NVIDIA NIM's /models endpoint returns model
 // catalogs that vary by region and key-tier, and some keys 404 on it,
@@ -240,7 +253,7 @@ export async function validateNvidiaProvider({ apiKey, providerSpecificData }: a
     // Any non-auth response (200, 400, 422, 429) means auth passed
     return { valid: true, error: null };
   } catch (error: any) {
-    return toValidationErrorResult(error);
+    return normalizeNvidiaValidationFailure(error);
   }
 }
 

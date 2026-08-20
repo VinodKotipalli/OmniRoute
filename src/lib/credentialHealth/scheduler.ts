@@ -23,6 +23,10 @@ import {
   removeCredentialHealth,
   initCredentialCache,
 } from "@/lib/credentialHealth/cache";
+import {
+  isCredentialProbeInconclusive,
+  resolveInconclusiveProbeRecheckDelayMs,
+} from "@/lib/credentialHealth/probePolicy";
 import { emit } from "@/lib/events/eventBus";
 import { isAutomatedTestProcess } from "@/shared/utils/testProcess";
 import { SEARCH_VALIDATOR_CONFIGS } from "@/lib/providers/validation/searchProviders";
@@ -130,9 +134,21 @@ async function testConnection(
     const state = getSchedulerState();
 
     if (result.valid) {
-      // Success — reset failure count + timing, update cache
+      // Success resets failure state. Credential-inconclusive probes remain
+      // active but are checked less often because repeating an expensive probe
+      // does not add authentication evidence.
       state.failureCounts.delete(connectionId);
-      state.perConnTiming.delete(connectionId);
+
+      if (isCredentialProbeInconclusive(result)) {
+        const recheckDelayMs = resolveInconclusiveProbeRecheckDelayMs(getSweepInterval());
+        state.perConnTiming.set(connectionId, {
+          lastAttemptAt: startTime,
+          nextAttemptAt: Date.now() + recheckDelayMs,
+        });
+      } else {
+        state.perConnTiming.delete(connectionId);
+      }
+
       setCredentialHealth(
         connectionId,
         provider,
