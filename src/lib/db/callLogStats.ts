@@ -239,3 +239,34 @@ export function getFallbackStats(
     .get(params) as FallbackStatsRow | undefined;
   return row ?? { total: 0, with_requested: 0, fallback_eligible: 0, fallbacks: 0 };
 }
+
+/**
+ * Failure-family breakdown over `call_logs` for the usage analytics endpoint.
+ * Failures are rows with status >= 400 or a non-empty error summary; successes
+ * are excluded in SQL. Pre-migration rows and failures the classifier does not
+ * recognize (null family) land in the explicit `unclassified` bucket.
+ *
+ * @param whereClause - SQL WHERE clause (may be empty string) using the same
+ *                      named params as the usage_history queries.
+ * @param params      - Named params object (string values).
+ */
+export function getErrorTypeBreakdown(
+  whereClause: string,
+  params: Record<string, string>
+): Array<{ errorType: string; count: number }> {
+  const db = getDbInstance();
+  const rows = db
+    .prepare(
+      `
+      SELECT
+        COALESCE(error_type, 'unclassified') AS errorType,
+        COUNT(*) AS count
+      FROM call_logs
+      ${whereClause} ${whereClause ? "AND" : "WHERE"} (status >= 400 OR error_summary IS NOT NULL)
+      GROUP BY 1
+      ORDER BY count DESC, errorType ASC
+      `
+    )
+    .all(params) as Array<{ errorType: string; count: number }>;
+  return rows.map((row) => ({ errorType: String(row.errorType), count: Number(row.count) }));
+}

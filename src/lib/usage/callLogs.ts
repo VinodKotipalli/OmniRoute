@@ -39,6 +39,7 @@ import {
   toStoredErrorSummary,
   protectPipelinePayloads,
   buildRequestSummary,
+  classifyCallLogError,
 } from "./callLogs/format";
 import {
   clearArtifactReference,
@@ -464,12 +465,14 @@ async function saveCallLogOperation(entry: any): Promise<void> {
     // while reasoning source/char-count are recorded separately for observability.
     const tokensReasoning = getReasoningTokensOrNull(entry.tokens);
     const reasoningObservation = resolveReasoningObservation(tokensReasoning, entry.responseBody);
+    const errorType = classifyCallLogError(entry.status, entry.error, entry.provider);
     const logEntry = {
       id: typeof entry.id === "string" && entry.id.length > 0 ? entry.id : generateLogId(),
       timestamp: typeof entry.timestamp === "string" ? entry.timestamp : new Date().toISOString(),
       method: entry.method || "POST",
       path: entry.path || "/v1/chat/completions",
       status: entry.status || 0,
+      errorType,
       model: entry.model || "-",
       requestedModel: resolvedRequestedModel,
       provider: rawProvider,
@@ -550,7 +553,7 @@ async function saveCallLogOperation(entry: any): Promise<void> {
         combo_name, combo_step_id, combo_execution_key, error_summary, detail_state,
         artifact_relpath, artifact_size_bytes, artifact_sha256,
         has_request_body, has_response_body, has_pipeline_details, request_summary,
-        correlation_id, model_pinned, session_tag, response_id
+        correlation_id, model_pinned, session_tag, response_id, error_type
       )
       VALUES (
         @id, @timestamp, @method, @path, @status, @model, @requestedModel, @provider,
@@ -561,7 +564,7 @@ async function saveCallLogOperation(entry: any): Promise<void> {
         @comboName, @comboStepId, @comboExecutionKey, @errorSummary, @detailState,
         @artifactRelPath, @artifactSizeBytes, @artifactSha256,
         @hasRequestBody, @hasResponseBody, @hasPipelineDetails, @requestSummary,
-        @correlationId, @modelPinned, @sessionTag, @responseId
+        @correlationId, @modelPinned, @sessionTag, @responseId, @errorType
       )
     `
     ).run({
