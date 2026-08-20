@@ -701,6 +701,19 @@ export function translateRequest(
     delete result[RESPONSES_STORE_MARKER];
   }
 
+  // #7293 follow-up: the pre-translation hoist above normalizes the *source*
+  // message array, which a target translator can then undo. `claudeToOpenAI`
+  // pushes `body.system` as a fresh leading system message before appending the
+  // converted messages, so an already-hoisted system lands at index 1 again;
+  // a Responses-source request has no `messages` at all until translation, so
+  // the earlier call is a no-op for it. Re-run on the final outbound array —
+  // it is the only shape the upstream actually sees. Idempotent: same array
+  // reference for non-strict providers and already-compliant requests, so
+  // prompt-cache prefixes stay stable.
+  if (targetFormat === FORMATS.OPENAI && result.messages && Array.isArray(result.messages)) {
+    result.messages = hoistLeadingSystemMessage(result.messages, provider);
+  }
+
   return result;
 }
 
