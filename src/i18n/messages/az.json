@@ -3718,7 +3718,12 @@
     "errorDescription": "Hazırda kombinasiyalı məlumatları yükləyə bilmirik. Bağlantınızı yoxlayın və yenidən cəhd edin.",
     "errorId": "Xəta ID: {id}",
     "errorRetry": "Yenidən Cəhd Et",
-    "comboLabel": "Kombinasiya"
+    "comboLabel": "Kombinasiya",
+    "duplicateAutoComboConfirm": "\"{name}\"-dan statik kombo yaratmaq?",
+    "duplicateAutoComboSnapshotMsg": "Bu, bu şablona uyğun olan hazırkı qoşulmuş provayderləri/modeləri redaktə oluna bilən kombo kimi saxlayacaq.",
+    "duplicateAutoComboFailedPrefix": "Avtokombo kopyalanması uğursuz oldu:",
+    "duplicateAutoComboUnknownError": "Naməlum xəta",
+    "duplicateAutoComboTitle": "{name}-dan statik kombo yarat"
   },
   "costs": {
     "title": "Costs",

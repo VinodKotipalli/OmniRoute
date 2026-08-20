@@ -3718,7 +3718,12 @@
     "errorDescription": "در حال حاضر نمی‌توانیم داده‌های ترکیبی را بارگذاری کنیم. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
     "errorId": "شناسه خطا: {id}",
     "errorRetry": "دوباره تلاش کنید",
-    "comboLabel": "ترکیب"
+    "comboLabel": "ترکیب",
+    "duplicateAutoComboConfirm": "ایجاد یک ترکیب ثابت از \"{name}\"؟",
+    "duplicateAutoComboSnapshotMsg": "این ارائه‌دهندگان/مدل‌های متصل فعلی که با این قالب مطابقت دارند را در یک ترکیب قابل ویرایش ذخیره می‌کند.",
+    "duplicateAutoComboFailedPrefix": "تکرار ترکیب خودکار ناموفق بود:",
+    "duplicateAutoComboUnknownError": "خطای ناشناخته",
+    "duplicateAutoComboTitle": "ایجاد یک ترکیب ثابت از {name}"
   },
   "costs": {
     "title": "Costs",

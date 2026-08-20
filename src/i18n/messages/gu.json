@@ -3718,7 +3718,12 @@
     "errorDescription": "અમે હાલમાં કોમ્બો ડેટા લોડ કરી શક્યા નથી. તમારી કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
     "errorId": "ભૂલ આઈડી: {id}",
     "errorRetry": "ફરીથી પ્રયાસ કરો",
-    "comboLabel": "કોમ્બો"
+    "comboLabel": "કોમ્બો",
+    "duplicateAutoComboConfirm": "\"{name}\" માંથી સ્ટેટિક કોમ્બો બનાવશો?",
+    "duplicateAutoComboSnapshotMsg": "આ ટેમપ્લેટ સાથે મેચ થતા વર્તમાન જોડાયેલા પ્રદાતાઓ/મોડેલને સંપાદનીય કોમ્બોમાં સ્નેપશોટ લેશે.",
+    "duplicateAutoComboFailedPrefix": "ઓટોકોમ્બો ડુપ્લિકેટ કરવામાં નિષ્ફળ:",
+    "duplicateAutoComboUnknownError": "અજ્ઞાત ભૂલ",
+    "duplicateAutoComboTitle": "{name} માંથી સ્ટેટિક કોમ્બો બનાવો"
   },
   "costs": {
     "title": "Costs",

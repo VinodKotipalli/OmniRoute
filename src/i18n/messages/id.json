@@ -3718,7 +3718,12 @@
     "errorDescription": "Kami tidak dapat memuat data kombinasi saat ini. Periksa koneksi Anda dan coba lagi.",
     "errorId": "Error ID: {id}",
     "errorRetry": "Coba Lagi",
-    "comboLabel": "Combo"
+    "comboLabel": "Combo",
+    "duplicateAutoComboConfirm": "Buat kombo statis dari \"{name}\"?",
+    "duplicateAutoComboSnapshotMsg": "Ini akan mengambil snapshot penyedia/model yang terhubung saat ini yang cocok dengan templat ini ke dalam kombo yang dapat diedit.",
+    "duplicateAutoComboFailedPrefix": "Gagal menduplikasi kombo otomatis:",
+    "duplicateAutoComboUnknownError": "Kesalahan tidak diketahui",
+    "duplicateAutoComboTitle": "Buat kombo statis dari {name}"
   },
   "costs": {
     "title": "Biaya",

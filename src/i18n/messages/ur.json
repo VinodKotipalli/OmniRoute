@@ -3718,7 +3718,12 @@
     "errorDescription": "ہم اس وقت کومبو ڈیٹا لوڈ نہیں کر سکے۔ اپنی کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
     "errorId": "خرابی کی شناخت: {id}",
     "errorRetry": "پھر کوشش کریں",
-    "comboLabel": "کمبو"
+    "comboLabel": "کمبو",
+    "duplicateAutoComboConfirm": "\"{name}\" سے ایک جامد کمبو بنائیں؟",
+    "duplicateAutoComboSnapshotMsg": "یہ اس ٹیمپلیٹ سے ملنے والے موجودہ منسلک فراہم کنندگان/ماڈلز کو ایڈیٹ ایبل کمبو میں اسنیپ شاট لے گا۔",
+    "duplicateAutoComboFailedPrefix": "آٹو کمبو ڈپلیکیٹ کرنے میں ناکام:",
+    "duplicateAutoComboUnknownError": "نامعلوم خرابی",
+    "duplicateAutoComboTitle": "{name} سے ایک جامد کمبو بنائیں"
   },
   "costs": {
     "title": "Costs",

@@ -3718,7 +3718,12 @@
     "errorDescription": "Şu anda kombinasyon verilerini yükleyemedik. Bağlantınızı kontrol edin ve tekrar deneyin.",
     "errorId": "Hata Kimliği: {id}",
     "errorRetry": "Tekrar Dene",
-    "comboLabel": "Kombinasyon"
+    "comboLabel": "Kombinasyon",
+    "duplicateAutoComboConfirm": "\"{name}\"-den statik bir kombinasyon oluşturulsun mu?",
+    "duplicateAutoComboSnapshotMsg": "Bu, bu şablona uygun olarak şu anda bağlı olan sağlayıcıları/modelleri düzenlenebilir bir kombinasyonda yakalayacaktır.",
+    "duplicateAutoComboFailedPrefix": "Otomatik kombinasyon kopyalanamadı:",
+    "duplicateAutoComboUnknownError": "Bilinmeyen hata",
+    "duplicateAutoComboTitle": "{name}-den statik bir kombinasyon oluştur"
   },
   "costs": {
     "title": "Maliyetler",

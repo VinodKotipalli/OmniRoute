@@ -3718,7 +3718,12 @@
     "errorDescription": "Jelenleg nem tudtuk betölteni a kombinált adatokat. Ellenőrizze a kapcsolatát, és próbálja újra.",
     "errorId": "Hibaazonosító: {id}",
     "errorRetry": "Próbáld újra",
-    "comboLabel": "Kombó"
+    "comboLabel": "Kombó",
+    "duplicateAutoComboConfirm": "Létrehoz egy statikus kombinációt a(z) \"{name}\"-ból?",
+    "duplicateAutoComboSnapshotMsg": "Ez rögzíti az éppen csatlakoztatott szolgáltatókat/modelleket, amelyek megfelelnek ennek a sablonnak, egy szerkeszthető kombinációba.",
+    "duplicateAutoComboFailedPrefix": "Az automatikus kombináció duplikálása sikertelen:",
+    "duplicateAutoComboUnknownError": "Ismeretlen hiba",
+    "duplicateAutoComboTitle": "Hozzon létre statikus kombinációt a(z) {name}-ból"
   },
   "costs": {
     "title": "Költségek",

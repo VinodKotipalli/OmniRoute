@@ -3718,7 +3718,12 @@
     "errorDescription": "Emme voi ladata yhdistelmädataa juuri nyt. Tarkista yhteytesi ja yritä uudelleen.",
     "errorId": "Virhe ID: {id}",
     "errorRetry": "Yritä uudelleen",
-    "comboLabel": "Yhdistelmä"
+    "comboLabel": "Yhdistelmä",
+    "duplicateAutoComboConfirm": "Luodaanko staattinen yhdistelmä \"{name}\"?",
+    "duplicateAutoComboSnapshotMsg": "Tämä tallentaa tämän mallin mukaiset tällä hetkellä yhdistetyt tarjoajat/mallit muokattavaan yhdistelmään.",
+    "duplicateAutoComboFailedPrefix": "Automaattisen yhdistelmän kaksoiskappaleen luonti epäonnistui:",
+    "duplicateAutoComboUnknownError": "Tuntematon virhe",
+    "duplicateAutoComboTitle": "Luo staattinen yhdistelmä kohteesta {name}"
   },
   "costs": {
     "title": "Kustannukset",

@@ -3718,7 +3718,12 @@
     "errorDescription": "לא הצלחנו לטעון את נתוני הקומבו כרגע. בדוק את החיבור שלך ונסה שוב.",
     "errorId": "שגיאת מזהה: {id}",
     "errorRetry": "נסה שוב",
-    "comboLabel": "קומבו"
+    "comboLabel": "קומבו",
+    "duplicateAutoComboConfirm": "ליצור קומבו סטטי מ־\"{name}\"?",
+    "duplicateAutoComboSnapshotMsg": "פעולה זו תצלם את הספקים/מודלים המחוברים כעת התואמים לתבנית הזו לקומבו ניתן לעריכה.",
+    "duplicateAutoComboFailedPrefix": "כשל בהעתיק קומבו אוטומטי:",
+    "duplicateAutoComboUnknownError": "שגיאה לא ידועה",
+    "duplicateAutoComboTitle": "צור קומבו סטטי מ־{name}"
   },
   "costs": {
     "title": "עלויות",

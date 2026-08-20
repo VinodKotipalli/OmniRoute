@@ -3718,7 +3718,12 @@
     "errorDescription": "Hatuwezi kupakia data ya combo kwa sasa. Angalia muunganisho wako na ujaribu tena.",
     "errorId": "Kosa ID: {id}",
     "errorRetry": "Jaribu Tena",
-    "comboLabel": "Combo"
+    "comboLabel": "Combo",
+    "duplicateAutoComboConfirm": "Tengeneza combo thabiti kutoka \"{name}\"?",
+    "duplicateAutoComboSnapshotMsg": "Hii itachukua picha ya watoa huduma/watolei sambazwa sasa yanayolingana na kioo hiki katika combo inayoedit.",
+    "duplicateAutoComboFailedPrefix": "Imeshindwa kuiga combo ya otomatiki:",
+    "duplicateAutoComboUnknownError": "Hitilafai isiyojulikana",
+    "duplicateAutoComboTitle": "Tengeneza combo thabiti kutoka {name}"
   },
   "costs": {
     "title": "Costs",

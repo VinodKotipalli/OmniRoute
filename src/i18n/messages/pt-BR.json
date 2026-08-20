@@ -3718,7 +3718,12 @@
     "errorDescription": "Não conseguimos carregar os dados do combo no momento. Verifique sua conexão e tente novamente.",
     "errorId": "ID de Erro: {id}",
     "errorRetry": "Tente Novamente",
-    "comboLabel": "Combo"
+    "comboLabel": "Combo",
+    "duplicateAutoComboConfirm": "Criar uma combinação estática de \"{name}\"?",
+    "duplicateAutoComboSnapshotMsg": "Isso irá capturar os provedores/modelos atualmente conectados que correspondem a este modelo em uma combinação editável.",
+    "duplicateAutoComboFailedPrefix": "Falha ao duplicar a combinação automática:",
+    "duplicateAutoComboUnknownError": "Erro desconhecido",
+    "duplicateAutoComboTitle": "Criar uma combinação estática de {name}"
   },
   "costs": {
     "title": "Custos",

@@ -3718,7 +3718,12 @@
     "errorDescription": "Kami tidak dapat memuatkan data combo buat masa ini. Semak sambungan anda dan cuba lagi.",
     "errorId": "Ralat ID: {id}",
     "errorRetry": "Cuba Lagi",
-    "comboLabel": "Gabungan"
+    "comboLabel": "Gabungan",
+    "duplicateAutoComboConfirm": "Cipta kombo statik dari \"{name}\"?",
+    "duplicateAutoComboSnapshotMsg": "Ini akan mengambil snapshot penyedia/model yang disambungkan semasa yang sepadan dengan templat ini ke dalam kombo yang boleh diedit.",
+    "duplicateAutoComboFailedPrefix": "Gagal menduplikasi kombo automatik:",
+    "duplicateAutoComboUnknownError": "Ralat tidak diketahui",
+    "duplicateAutoComboTitle": "Cipta kombo statik dari {name}"
   },
   "costs": {
     "title": "Kos",

@@ -3718,7 +3718,12 @@
     "errorDescription": "हम अभी कॉम्बो डेटा लोड नहीं कर सके। कृपया अपनी कनेक्शन की जांच करें और फिर से प्रयास करें।",
     "errorId": "त्रुटि आईडी: {id}",
     "errorRetry": "फिर से प्रयास करें",
-    "comboLabel": "कॉम्बो"
+    "comboLabel": "कॉम्बो",
+    "duplicateAutoComboConfirm": "\"{name}\" से एक स्थैतिक कॉम्बो बनाएं?",
+    "duplicateAutoComboSnapshotMsg": "यह इस टेम्पलेट से मेल खाने वाले वर्तमान जुड़े प्रदाताओं/मॉडल को संपादन योग्य कॉम्बो में स्नैपशॉट लेगा।",
+    "duplicateAutoComboFailedPrefix": "ऑटोकॉम्बो डुप्लिकेट करने में विफल:",
+    "duplicateAutoComboUnknownError": "अज्ञात त्रुटि",
+    "duplicateAutoComboTitle": "{name} से एक स्थैतिक कॉम्बो बनाएं"
   },
   "costs": {
     "title": "लागत",

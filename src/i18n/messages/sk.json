@@ -3718,7 +3718,12 @@
     "errorDescription": "Momentálne sa nám nepodarilo načítať údaje kombinácie. Skontrolujte svoje pripojenie a skúste to znova.",
     "errorId": "Chyba ID: {id}",
     "errorRetry": "Skúste znova",
-    "comboLabel": "Kombinácia"
+    "comboLabel": "Kombinácia",
+    "duplicateAutoComboConfirm": "Vytvoriť staticú kombináciu z \"{name}\"?",
+    "duplicateAutoComboSnapshotMsg": "Tým sa zachytí aktuálne pripojení poskytovatelia/modely, ktoré zodpovedajú tejto šablóne, do upraviteľnej kombinácie.",
+    "duplicateAutoComboFailedPrefix": "Duplikácia automatickej kombinácie zlyhala:",
+    "duplicateAutoComboUnknownError": "Neznáma chyba",
+    "duplicateAutoComboTitle": "Vytvorte staticú kombináciu z {name}"
   },
   "costs": {
     "title": "náklady",

@@ -3718,7 +3718,12 @@
     "errorDescription": "Vi kunne ikke laste inn kombinasjonsdata akkurat nå. Sjekk tilkoblingen din og prøv igjen.",
     "errorId": "Feil-ID: {id}",
     "errorRetry": "Prøv igjen",
-    "comboLabel": "Kombinasjon"
+    "comboLabel": "Kombinasjon",
+    "duplicateAutoComboConfirm": "Opprett en statisk kombinasjon fra \"{name}\"?",
+    "duplicateAutoComboSnapshotMsg": "Dette vil ta et øyeblikksbilde av de nåvørende tilkoblede leverandørene/modellene som matcher denne malen i en redigerbar kombinasjon.",
+    "duplicateAutoComboFailedPrefix": "Duplisering av auto-kombinasjon mislyktes:",
+    "duplicateAutoComboUnknownError": "Ukjent feil",
+    "duplicateAutoComboTitle": "Opprett en statisk kombinasjon fra {name}"
   },
   "costs": {
     "title": "Kostnader",

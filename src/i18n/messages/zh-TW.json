@@ -3718,7 +3718,12 @@
     "errorDescription": "目前無法加載組合數據。請檢查您的連接並重試。",
     "errorId": "錯誤 ID: {id}",
     "errorRetry": "再試一次",
-    "comboLabel": "組合"
+    "comboLabel": "組合",
+    "duplicateAutoComboConfirm": "從\"{name}\"建立靜態組合？",
+    "duplicateAutoComboSnapshotMsg": "這將把與此模板匹配的目前連線提供者/模型快照到可編輯的組合中。",
+    "duplicateAutoComboFailedPrefix": "複製自動組合失敗：",
+    "duplicateAutoComboUnknownError": "未知錯誤",
+    "duplicateAutoComboTitle": "從{name}建立靜態組合"
   },
   "costs": {
     "title": "成本",

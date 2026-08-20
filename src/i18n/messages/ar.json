@@ -3718,7 +3718,12 @@
     "errorDescription": "لم نتمكن من تحميل بيانات المجموعة في الوقت الحالي. تحقق من اتصالك وحاول مرة أخرى.",
     "errorId": "معرّف الخطأ: {id}",
     "errorRetry": "حاول مرة أخرى",
-    "comboLabel": "كومبو"
+    "comboLabel": "كومبو",
+    "duplicateAutoComboConfirm": "إنشاء مجموعة ثابتة من \"{name}\"؟",
+    "duplicateAutoComboSnapshotMsg": "سيؤدي هذا إلى التقاط المزودين/النماذج المتصلة حاليًا التي تطابق هذا القالب في مجموعة قابلة للتحرير.",
+    "duplicateAutoComboFailedPrefix": "فشل تكرار المجموعة التلقائية:",
+    "duplicateAutoComboUnknownError": "خطأ غير معروف",
+    "duplicateAutoComboTitle": "إنشاء مجموعة ثابتة من {name}"
   },
   "costs": {
     "title": "التكاليف",

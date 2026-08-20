@@ -3718,7 +3718,12 @@
     "errorDescription": "Vi kunne ikke indlæse kombinationsdata lige nu. Tjek din forbindelse og prøv igen.",
     "errorId": "Fejl ID: {id}",
     "errorRetry": "Prøv igen",
-    "comboLabel": "Kombination"
+    "comboLabel": "Kombination",
+    "duplicateAutoComboConfirm": "Opret en statisk kombination fra \"{name}\"?",
+    "duplicateAutoComboSnapshotMsg": "Dette vil tage et øjebliksbillede af de aktuelt tilsluttede udbydere/modeller, der matcher denne skabelon, i en redigerbar kombination.",
+    "duplicateAutoComboFailedPrefix": "Kopiering af auto-kombination mislykkedes:",
+    "duplicateAutoComboUnknownError": "Ukendt fejl",
+    "duplicateAutoComboTitle": "Opret en statisk kombination fra {name}"
   },
   "costs": {
     "title": "Omkostninger",

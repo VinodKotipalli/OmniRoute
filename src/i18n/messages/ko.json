@@ -3718,7 +3718,12 @@
     "errorDescription": "현재 콤보 데이터를 불러올 수 없습니다. 연결을 확인하고 다시 시도하세요.",
     "errorId": "오류 ID: {id}",
     "errorRetry": "다시 시도해 주세요",
-    "comboLabel": "콤보"
+    "comboLabel": "콤보",
+    "duplicateAutoComboConfirm": "\"{name}\"에서 정적 콤보를 만드시겠습니까?",
+    "duplicateAutoComboSnapshotMsg": "이 템플릿과 일치하는 현재 연결된 제공자/모델을 편집 가능한 콤보로 스냅샷합니다.",
+    "duplicateAutoComboFailedPrefix": "자동 콤보 복제 실패:",
+    "duplicateAutoComboUnknownError": "알 수 없는 오류",
+    "duplicateAutoComboTitle": "{name}에서 정적 콤보 만들기"
   },
   "costs": {
     "title": "비용",

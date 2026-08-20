@@ -3718,7 +3718,12 @@
     "errorDescription": "現在、コンボデータを読み込むことができません。接続を確認して、再試行してください。",
     "errorId": "エラー ID: {id}",
     "errorRetry": "もう一度試してください",
-    "comboLabel": "コンボ"
+    "comboLabel": "コンボ",
+    "duplicateAutoComboConfirm": "\"{name}\"から静的コンボを作成しますか？",
+    "duplicateAutoComboSnapshotMsg": "このテンプレートに一致する現在接続されているプロバイダー/モデルを編集可能なコンボとしてスナップショットします。",
+    "duplicateAutoComboFailedPrefix": "オートコンボの複製に失敗しました：",
+    "duplicateAutoComboUnknownError": "不明なエラー",
+    "duplicateAutoComboTitle": "{name}から静的コンボを作成"
   },
   "costs": {
     "title": "コスト",

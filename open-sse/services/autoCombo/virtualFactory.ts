@@ -20,6 +20,7 @@ import {
   type AutoCategory,
   type AutoTier,
 } from "./suffixComposition";
+import { classifyTier } from "../tierResolver";
 import type { AutoVariant } from "./autoPrefix";
 import { buildFamilyCandidateFilter, type ModelFamily } from "./modelFamily";
 import { getHiddenModelsByProvider } from "@/models";
@@ -604,6 +605,61 @@ export async function prepareVirtualAutoComboInputs(
   };
 }
 
+/**
+ * Score candidates at snapshot time using available data (capabilities, tier)
+ * and the mode-pack's dominant factors. Runtime telemetry (p95 latency, quota
+ * remaining) is not available during combo creation — this uses static signals only.
+ *
+ * Returns a map from modelStr → normalized weight score [0, 1].
+ */
+export function computeSnapshotWeights(
+  candidates: readonly VirtualAutoComboCandidate[],
+  weights: ScoringWeights
+): Map<string, number> {
+  const scores = new Map<string, number>();
+  for (const c of candidates) {
+    let score = 0;
+
+    // taskFit: reasoning + vision capable models score higher when taskFit is weighted
+    if (weights.taskFit > 0) {
+      if (c.resolvedReasoning || c.resolvedSupportsThinking) score += weights.taskFit * 0.6;
+      if (c.resolvedSupportsVision) score += weights.taskFit * 0.3;
+    }
+
+    // stability: models with richer capabilities are assumed more stable
+    if (weights.stability > 0) {
+      const capabilityCount =
+        Number(c.resolvedReasoning ?? false) +
+        Number(c.resolvedSupportsThinking ?? false) +
+        Number(c.resolvedSupportsVision ?? false);
+      score += weights.stability * Math.min(capabilityCount / 2, 1);
+    }
+
+    // Tier-based scoring (single classifyTier call covers both checks)
+    let tierInfo: { tier: string } | null = null;
+    if (weights.tierPriority > 0 || weights.costInv > 0) {
+      try {
+        tierInfo = classifyTier(c.provider, c.model);
+      } catch {
+        // fall through with zero
+      }
+    }
+    if (tierInfo && weights.tierPriority > 0 && tierInfo.tier === "premium")
+      score += weights.tierPriority;
+    if (tierInfo && weights.costInv > 0 && tierInfo.tier === "free") score += weights.costInv;
+
+    // latencyInv: all candidates get a base score when latency matters
+    // (no runtime data at snapshot time, so equal baseline)
+    if (weights.latencyInv > 0) score += weights.latencyInv * 0.5;
+
+    // health + quota: no runtime telemetry at snapshot time → neutral baseline
+    score += (weights.health + weights.quota) * 0.5;
+
+    scores.set(c.modelStr, Math.min(score, 1));
+  }
+  return scores;
+}
+
 function clonePreparedCandidates(
   candidates: readonly VirtualAutoComboCandidate[]
 ): VirtualAutoComboCandidate[] {
@@ -772,6 +828,7 @@ export async function createVirtualAutoComboFromPrepared(
   }
 
   const providerPool = [...new Set(effectivePool.map((c) => c.provider))];
+  const snapshotScores = computeSnapshotWeights(effectivePool, weights);
   const models = effectivePool.map((candidate, index) => ({
     id: `virtual-auto-${variant || "default"}-${index + 1}-${candidate.provider}`,
     kind: "model" as const,
@@ -781,7 +838,7 @@ export async function createVirtualAutoComboFromPrepared(
     ...(candidate.allowedConnectionIds
       ? { allowedConnectionIds: candidate.allowedConnectionIds }
       : {}),
-    weight: 1,
+    weight: snapshotScores.get(candidate.modelStr) ?? 1,
     label: candidate.provider,
   }));
   const autoConfig = {

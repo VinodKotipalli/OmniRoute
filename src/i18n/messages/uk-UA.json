@@ -3718,7 +3718,12 @@
     "errorDescription": "Ми не змогли завантажити дані комбо прямо зараз. Перевірте своє з'єднання та спробуйте ще раз.",
     "errorId": "Ідентифікатор помилки: {id}",
     "errorRetry": "Спробуйте ще раз",
-    "comboLabel": "Комбо"
+    "comboLabel": "Комбо",
+    "duplicateAutoComboConfirm": "Створити статичне комбо з \"{name}\"?",
+    "duplicateAutoComboSnapshotMsg": "Це зробить знімок поточно підключених постачальників/моделей, які відповідають цьому шаблону, у редаговане комбо.",
+    "duplicateAutoComboFailedPrefix": "Не вдалося дублювати автоматичне комбо:",
+    "duplicateAutoComboUnknownError": "Невідома помилка",
+    "duplicateAutoComboTitle": "Створити статичне комбо з {name}"
   },
   "costs": {
     "title": "Витрати",

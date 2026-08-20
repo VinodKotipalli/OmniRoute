@@ -3718,7 +3718,12 @@
     "errorDescription": "Hindi namin ma-load ang combo data sa ngayon. Suriin ang iyong koneksyon at subukan muli.",
     "errorId": "Error ID: {id}",
     "errorRetry": "Subukan Muli",
-    "comboLabel": "Kumbinasyon"
+    "comboLabel": "Kumbinasyon",
+    "duplicateAutoComboConfirm": "Gumawa ng static combo mula sa \"{name}\"?",
+    "duplicateAutoComboSnapshotMsg": "Ito ay kukuha ng snapshot ng kasalukuyang nakakonektang mga provider/model na tugma sa template na ito sa isang editable na combo.",
+    "duplicateAutoComboFailedPrefix": "Nabigo ang pag-duplicate ng auto-combo:",
+    "duplicateAutoComboUnknownError": "Hindi alam na error",
+    "duplicateAutoComboTitle": "Gumawa ng static combo mula sa {name}"
   },
   "costs": {
     "title": "Mga gastos",

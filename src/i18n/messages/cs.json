@@ -3718,7 +3718,12 @@
     "errorDescription": "Nyní se nám nepodařilo načíst data pro kombinaci. Zkontrolujte své připojení a zkuste to znovu.",
     "errorId": "Chyba ID: {id}",
     "errorRetry": "Zkusit znovu",
-    "comboLabel": "Kombinace"
+    "comboLabel": "Kombinace",
+    "duplicateAutoComboConfirm": "Vytvořit statickou kombinaci z \"{name}\"?",
+    "duplicateAutoComboSnapshotMsg": "Tím se zachytí aktuálně připojení poskytovatelé/modely, které odpovídají této šabloně, do upravitelné kombinace.",
+    "duplicateAutoComboFailedPrefix": "Duplikace automatické kombinace selhala:",
+    "duplicateAutoComboUnknownError": "Neznámá chyba",
+    "duplicateAutoComboTitle": "Vytvořte statickou kombinaci z {name}"
   },
   "costs": {
     "title": "Náklady",

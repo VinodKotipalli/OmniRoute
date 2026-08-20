@@ -3718,7 +3718,12 @@
     "errorDescription": "Nie mogliśmy teraz załadować danych combo. Sprawdź swoje połączenie i spróbuj ponownie.",
     "errorId": "Identyfikator błędu: {id}",
     "errorRetry": "Spróbuj ponownie",
-    "comboLabel": "Kombinacja"
+    "comboLabel": "Kombinacja",
+    "duplicateAutoComboConfirm": "Utworzyć statyczną kombinację z \"{name}\"?",
+    "duplicateAutoComboSnapshotMsg": "Spowoduje to przechwycenie aktualnie połączonych dostawców/modeli pasujących do tego szablonu w edytowalnej kombinacji.",
+    "duplicateAutoComboFailedPrefix": "Nie udało się skopiować automatycznej kombinacji:",
+    "duplicateAutoComboUnknownError": "Nieznany błąd",
+    "duplicateAutoComboTitle": "Utwórz statyczną kombinację z {name}"
   },
   "costs": {
     "title": "Koszty",

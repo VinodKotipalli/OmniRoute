@@ -3718,7 +3718,12 @@
     "errorDescription": "Hiện không thể tải dữ liệu combo. Hãy kiểm tra kết nối rồi thử lại.",
     "errorId": "ID lỗi: {id}",
     "errorRetry": "Thử lại",
-    "comboLabel": "Combo"
+    "comboLabel": "Combo",
+    "duplicateAutoComboConfirm": "Tạo một tổ hợp tĩnh từ \"{name}\"?",
+    "duplicateAutoComboSnapshotMsg": "Điều này sẽ chụp lại các nhà cung cấp/mô hình đang kết nối hiện tại phù hợp với mẫu này vào một tổ hợp có thể chỉnh sửa.",
+    "duplicateAutoComboFailedPrefix": "Không thể sao chép tổ hợp tự động:",
+    "duplicateAutoComboUnknownError": "Lỗi không xác định",
+    "duplicateAutoComboTitle": "Tạo tổ hợp tĩnh từ {name}"
   },
   "costs": {
     "title": "Chi phí",

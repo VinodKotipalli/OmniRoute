@@ -3718,7 +3718,12 @@
     "errorDescription": "நாங்கள் தற்போது கம்போ தரவுகளை ஏற்ற முடியவில்லை. உங்கள் இணைப்பை சரிபார்க்கவும் மற்றும் மீண்டும் முயற்சிக்கவும்.",
     "errorId": "பிழை அடையாளம்: {id}",
     "errorRetry": "மீண்டும் முயற்சி செய்",
-    "comboLabel": "கொம்போ"
+    "comboLabel": "கொம்போ",
+    "duplicateAutoComboConfirm": "\"{name}\" இலிருந்து நிலையான கம்போ உருவாக்கவா?",
+    "duplicateAutoComboSnapshotMsg": "இந்த டெம்ப்ளேட்டுடன் பொருந்தும் தற்போதைய இணைக்கப்பட்ட வழங்குநர்கள்/மாதிரிகளை திருத்தக்கூடிய கம்போவில் எடுக்கும்.",
+    "duplicateAutoComboFailedPrefix": "ஆட்டோகம்போ நகலெடுத்தல் தோல்வியடைந்தது:",
+    "duplicateAutoComboUnknownError": "அறியப்படாத பிழை",
+    "duplicateAutoComboTitle": "{name} இலிருந்து நிலையான கம்போ உருவாக்கவும்"
   },
   "costs": {
     "title": "Costs",

@@ -3718,7 +3718,12 @@
     "errorDescription": "ไม่สามารถโหลดข้อมูลคอมโบได้ในขณะนี้ กรุณาตรวจสอบการเชื่อมต่อของคุณและลองอีกครั้ง.",
     "errorId": "รหัสข้อผิดพลาด: {id}",
     "errorRetry": "ลองอีกครั้ง",
-    "comboLabel": "คอมโบ"
+    "comboLabel": "คอมโบ",
+    "duplicateAutoComboConfirm": "สร้างคอมโบคงที่จาก \"{name}\" หรือไม่?",
+    "duplicateAutoComboSnapshotMsg": "สิ่งนี้จะจับภาพผู้ให้บริการ/โมเดลที่เชื่อมต่ออยู่ในปัจจุบันซึ่งตรงกับเทมเพลตนี้ลงในคอมโบที่แก้ไขได้",
+    "duplicateAutoComboFailedPrefix": "ล้มเหลวในการทำสำเนาคอมโบอัตโนมัติ:",
+    "duplicateAutoComboUnknownError": "ข้อผิดพลาดที่ไม่ทราบสาเหตุ",
+    "duplicateAutoComboTitle": "สร้างคอมโบคงที่จาก {name}"
   },
   "costs": {
     "title": "ค่าใช้จ่าย",

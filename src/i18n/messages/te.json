@@ -3718,7 +3718,12 @@
     "errorDescription": "మేము ప్రస్తుతం కాంబో డేటాను లోడ్ చేయలేకపోయాము. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
     "errorId": "లోపం ID: {id}",
     "errorRetry": "మరలా ప్రయత్నించండి",
-    "comboLabel": "కాంబో"
+    "comboLabel": "కాంబో",
+    "duplicateAutoComboConfirm": "\"{name}\" నుండి స్థిర కంబో సృష్టించాలా?",
+    "duplicateAutoComboSnapshotMsg": "ఈ టెంప్లేట్‌తో సరిపోయే ప్రస్తుత కనెక్ట్ చేసిన ప్రొవైడర్లు/మోడల్‌లను ఎడిటబుల్ కంబోలో స్నాప్‌షాట్ తీసుకుంటుంది.",
+    "duplicateAutoComboFailedPrefix": "ఆటోకంబో డూప్లికేట్ చేయడంలో విఫలమైంది:",
+    "duplicateAutoComboUnknownError": "తెలియని దోషం",
+    "duplicateAutoComboTitle": "{name} నుండి స్థిర కంబో సృష్టించండి"
   },
   "costs": {
     "title": "Costs",

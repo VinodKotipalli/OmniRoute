@@ -3718,7 +3718,12 @@
     "errorDescription": "Wir konnten die Kombinationsdaten momentan nicht laden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
     "errorId": "Fehler-ID: {id}",
     "errorRetry": "Versuche es erneut",
-    "comboLabel": "Kombination"
+    "comboLabel": "Kombination",
+    "duplicateAutoComboConfirm": "Eine statische Kombination aus \"{name}\" erstellen?",
+    "duplicateAutoComboSnapshotMsg": "Dadurch werden die aktuell verbundenen Anbieter/Modelle, die dieser Vorlage entsprechen, in einer bearbeitbaren Kombination gespeichert.",
+    "duplicateAutoComboFailedPrefix": "Automatische Kombination konnte nicht dupliziert werden:",
+    "duplicateAutoComboUnknownError": "Unbekannter Fehler",
+    "duplicateAutoComboTitle": "Erstelle eine statische Kombination aus {name}"
   },
   "costs": {
     "title": "Kosten",

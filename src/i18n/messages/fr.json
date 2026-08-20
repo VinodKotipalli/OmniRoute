@@ -3718,7 +3718,12 @@
     "errorDescription": "Les données des combos ne peuvent pas être chargées pour le moment. Vérifiez votre connexion et réessayez.",
     "errorId": "ID d'erreur : {id}",
     "errorRetry": "Réessayer",
-    "comboLabel": "Combo"
+    "comboLabel": "Combo",
+    "duplicateAutoComboConfirm": "Créer une combinaison statique à partir de \"{name}\" ?",
+    "duplicateAutoComboSnapshotMsg": "Cela capturera les fournisseurs/modèles actuellement connectés qui correspondent à ce modèle dans une combinaison modifiable.",
+    "duplicateAutoComboFailedPrefix": "Échec de la duplication de la combinaison automatique :",
+    "duplicateAutoComboUnknownError": "Erreur inconnue",
+    "duplicateAutoComboTitle": "Créer une combinaison statique à partir de {name}"
   },
   "costs": {
     "title": "Coûts",

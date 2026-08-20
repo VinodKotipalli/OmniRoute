@@ -3718,7 +3718,12 @@
     "errorDescription": "Vi kunde inte ladda combo-data just nu. Kontrollera din anslutning och försök igen.",
     "errorId": "Fel-ID: {id}",
     "errorRetry": "Försök igen",
-    "comboLabel": "Kombination"
+    "comboLabel": "Kombination",
+    "duplicateAutoComboConfirm": "Skapa en statisk kombination från \"{name}\"?",
+    "duplicateAutoComboSnapshotMsg": "Detta kommer att ta en ögonblicksbild av de för närvarande anslutna leverantörerna/modellerna som matchar denna mall i en redigerbar kombination.",
+    "duplicateAutoComboFailedPrefix": "Kopiering av automatisk kombination misslyckades:",
+    "duplicateAutoComboUnknownError": "Okänt fel",
+    "duplicateAutoComboTitle": "Skapa en statisk kombination från {name}"
   },
   "costs": {
     "title": "Kostnader",

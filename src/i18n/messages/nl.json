@@ -3718,7 +3718,12 @@
     "errorDescription": "We konden de combogegevens op dit moment niet laden. Controleer je verbinding en probeer het opnieuw.",
     "errorId": "Fout-ID: {id}",
     "errorRetry": "Probeer het opnieuw",
-    "comboLabel": "Combo"
+    "comboLabel": "Combo",
+    "duplicateAutoComboConfirm": "Een statische combinatie maken van \"{name}\"?",
+    "duplicateAutoComboSnapshotMsg": "Dit maakt een momentopname van de momenteel verbonden providers/modellen die overeenkomen met dit sjabloon in een bewerkbare combinatie.",
+    "duplicateAutoComboFailedPrefix": "Automatische combinatie dupliceren mislukt:",
+    "duplicateAutoComboUnknownError": "Onbekende fout",
+    "duplicateAutoComboTitle": "Maak een statische combinatie van {name}"
   },
   "costs": {
     "title": "Kosten",

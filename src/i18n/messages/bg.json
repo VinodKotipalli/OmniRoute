@@ -3718,7 +3718,12 @@
     "errorDescription": "Не успяхме да заредим данните за комбинирането в момента. Проверете връзката си и опитайте отново.",
     "errorId": "Идентификатор на грешка: {id}",
     "errorRetry": "Опитай отново",
-    "comboLabel": "Комбо"
+    "comboLabel": "Комбо",
+    "duplicateAutoComboConfirm": "Да създадете статично комбо от \"{name}\"?",
+    "duplicateAutoComboSnapshotMsg": "Това ще направи моментна снимка на текущо свързаните доставчици/модели, които съвпадат с този шаблон, в редактируемо комбо.",
+    "duplicateAutoComboFailedPrefix": "Неуспешно копиране на автоматично комбо:",
+    "duplicateAutoComboUnknownError": "Неизвестна грешка",
+    "duplicateAutoComboTitle": "Създайте статично комбо от {name}"
   },
   "costs": {
     "title": "Разходи",

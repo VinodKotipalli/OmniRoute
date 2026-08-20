@@ -3718,7 +3718,12 @@
     "errorDescription": "我们现在无法加载组合数据。请检查您的连接并重试。",
     "errorId": "错误 ID: {id}",
     "errorRetry": "再试一次",
-    "comboLabel": "组合"
+    "comboLabel": "组合",
+    "duplicateAutoComboConfirm": "从\"{name}\"创建静态组合？",
+    "duplicateAutoComboSnapshotMsg": "这将把与此模板匹配的当前连接提供商/模型快照到可编辑的组合中。",
+    "duplicateAutoComboFailedPrefix": "复制自动组合失败：",
+    "duplicateAutoComboUnknownError": "未知错误",
+    "duplicateAutoComboTitle": "从{name}创建静态组合"
   },
   "costs": {
     "title": "成本",

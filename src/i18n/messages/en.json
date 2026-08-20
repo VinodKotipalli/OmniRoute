@@ -3718,7 +3718,12 @@
     "errorDescription": "We could not load combo data right now. Check your connection and try again.",
     "errorId": "Error ID: {id}",
     "errorRetry": "Try Again",
-    "comboLabel": "Combo"
+    "comboLabel": "Combo",
+    "duplicateAutoComboConfirm": "Create a static combo from \"{name}\"?",
+    "duplicateAutoComboSnapshotMsg": "This will snapshot the currently connected providers/models that match this template into an editable combo.",
+    "duplicateAutoComboFailedPrefix": "Failed to duplicate auto-combo:",
+    "duplicateAutoComboUnknownError": "Unknown error",
+    "duplicateAutoComboTitle": "Create a static combo from {name}"
   },
   "costs": {
     "title": "Costs",

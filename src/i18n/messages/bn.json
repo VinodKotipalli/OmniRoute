@@ -3718,7 +3718,12 @@
     "errorDescription": "আমরা এখন কম্বো ডেটা লোড করতে পারিনি। আপনার সংযোগ পরীক্ষা করুন এবং আবার চেষ্টা করুন।",
     "errorId": "ত্রুটি আইডি: {id}",
     "errorRetry": "পুনরায় চেষ্টা করুন",
-    "comboLabel": "কম্বো"
+    "comboLabel": "কম্বো",
+    "duplicateAutoComboConfirm": "\"{name}\" থেকে একটি স্ট্যাটিক কম্বো তৈরি করবেন?",
+    "duplicateAutoComboSnapshotMsg": "এটি এই টেমপ্লেটের সাথে মিলে যায় এমন বর্তমান সংযুক্ত প্রদানকারী/মডেলগুলিকে একটি সম্পাদনযোগ্য কম্বোতে স্ন্যাপশট নেবে।",
+    "duplicateAutoComboFailedPrefix": "অটোকম্বো ডুপ্লিকেশন ব্যর্থ:",
+    "duplicateAutoComboUnknownError": "অজানা ত্রুটি",
+    "duplicateAutoComboTitle": "{name} থেকে একটি স্ট্যাটিক কম্বো তৈরি করুন"
   },
   "costs": {
     "title": "Costs",
