@@ -402,7 +402,7 @@ runBuildTool(
 // The worker is spawned via worker_threads at a path the Next.js bundler cannot
 // statically trace, so it must ship as a standalone .js (mirrors the MCP-server
 // bundling above). Heavy deps (@atjsh/llmlingua-2 / @huggingface/transformers /
-// @tensorflow/tfjs / js-tiktoken) stay EXTERNAL — they are optionalDependencies,
+// js-tiktoken) stay EXTERNAL — they are optionalDependencies,
 // dynamically imported at runtime, and the worker fail-opens if any is absent.
 const llmWorkerSrc = join(
   ROOT,
