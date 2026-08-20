@@ -3698,9 +3698,13 @@
     "agentFeaturesToolFilterHint": "Regex lọc công cụ cho tác nhân",
     "agentFeaturesContextCacheHint": "Bật cache trong ngữ cảnh cho các công cụ của tác nhân",
     "agentFeaturesContextCacheProtection": "Bảo vệ cache khỏi các thay đổi do công cụ của tác nhân gây ra",
-    "agentFeaturesContextLength": "Độ dài ngữ cảnh",
+    "agentFeaturesContextLength": "Độ dài ngữ cảnh thủ công",
     "agentFeaturesContextLengthPlaceholder": "ví dụ: 128000",
-    "agentFeaturesContextLengthHint": "Xác định cửa sổ ngữ cảnh cho combo này trong /v1/models.",
+    "contextAggregationLabel": "Tổng hợp ngữ cảnh",
+    "contextAggregationMin": "Tối thiểu (mặc định an toàn)",
+    "contextAggregationMax": "Tối đa",
+    "contextAggregationWarning": "Giá trị tối đa có thể vượt quá các đích nhỏ hơn; giới hạn đầu vào/đầu ra vẫn được giữ ở mức thận trọng.",
+    "agentFeaturesContextLengthHint": "Giá trị thủ công sẽ ghi đè phép tổng hợp của các đích.",
     "agentFeaturesContextLengthErrorInteger": "Độ dài ngữ cảnh phải là số nguyên hợp lệ",
     "agentFeaturesContextLengthErrorRange": "Độ dài ngữ cảnh phải nằm trong khoảng từ 1000 đến 2000000",
     "compressionOverride": "Ghi đè nén",
@@ -12867,6 +12871,28 @@
     "unknown": "không xác định",
     "unknownProvider": "nhà cung cấp không xác định",
     "unknownModel": "mô hình không xác định",
+    "contextDiagnostics": {
+      "title": "Chẩn đoán ngữ cảnh",
+      "summary": "{mode} · {source} · hiệu dụng {effective} · {count} đã biết · tối thiểu {min} · tối đa {max}",
+      "mode": { "min": "Tối thiểu", "max": "Tối đa" },
+      "sources": {
+        "manual": "Thủ công",
+        "aggregated": "Đã tổng hợp",
+        "unknown": "Không xác định"
+      },
+      "providerModel": "Nhà cung cấp/mô hình",
+      "context": "Ngữ cảnh",
+      "input": "Đầu vào",
+      "output": "Đầu ra",
+      "sourceHeader": "Nguồn",
+      "noTargets": "Không có đích nào được phân giải.",
+      "unknownReason": {
+        "target-unresolved": "Không phân giải được đích",
+        "metadata-unresolved": "Không phân giải được metadata",
+        "metadata-source-unknown": "Không xác định được nguồn metadata",
+        "context-limit-unknown": "Không xác định được giới hạn ngữ cảnh"
+      }
+    },
     "resolvedTargetMetrics": "{requests} yêu cầu · {success} thành công · {latency} · hạn ngạch {quota}"
   },
   "usageLimits": {

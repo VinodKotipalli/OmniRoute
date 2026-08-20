@@ -13,13 +13,29 @@ import {
 import { getSyncedCapability } from "@/lib/modelsDevSync";
 import { MODELS_DEV_PROVIDER_MAP } from "@/lib/modelsDevSync/transform";
 import { getModelContextOverride } from "@/lib/db/modelContextOverrides";
-import { getModelCapabilityOverride } from "@/lib/db/modelCapabilityOverrides";
 import { getCustomModelVisionOverride } from "@/lib/db/models";
 import type { ModelCapabilityResolutionSnapshot } from "@/lib/modelCapabilityResolutionSnapshot";
+import {
+  isResolutionSnapshot,
+  resolveClampedMaxInputLimit,
+  type ResolvedLimitSource,
+} from "@/lib/modelCapabilityLimits";
+import {
+  getContextOverride,
+  getContextOverrideRecord,
+  getInputTokenCapabilityOverride,
+  getOutputTokenCapabilityOverride,
+} from "@/lib/modelCapabilityOverrideResolution";
 import { resolveAudioCapability, resolveVideoCapability } from "@/lib/modelCapabilityModalities";
-
 export type { ModelCapabilityResolutionSnapshot } from "@/lib/modelCapabilityResolutionSnapshot";
+export type { ResolvedLimitSource } from "@/lib/modelCapabilityLimits";
+export { isPersistedResolvedLimitSource } from "@/lib/modelCapabilityLimits";
 export { createModelCapabilityResolutionSnapshot } from "@/lib/modelCapabilityResolutionSnapshot";
+
+/** Resolve a persisted context override by canonical id, then exact raw alias. */
+export function getResolvedModelContextOverride(input: CapabilityInput): number | null {
+  return getContextOverride(resolveCapabilityInput(input));
+}
 export { resolveAudioCapability } from "@/lib/modelCapabilityModalities";
 import { isVisionModelId } from "@/shared/constants/visionModels";
 import { getUnsupportedParams } from "@omniroute/open-sse/config/providerRegistry.ts";
@@ -108,6 +124,8 @@ type SyncedCapabilities = ReturnType<typeof getSyncedCapability>;
  */
 export interface ResolveModelCapabilitiesOptions {
   persistedOverrides?: boolean;
+  /** Optional build-local bulk view for catalog preparation (#9199). */
+  snapshot?: ModelCapabilityResolutionSnapshot | null;
 }
 
 export interface ResolvedModelCapabilities {
@@ -126,8 +144,11 @@ export interface ResolvedModelCapabilities {
   structuredOutput: boolean | null;
   temperature: boolean | null;
   contextWindow: number | null;
+  contextWindowSource: ResolvedLimitSource | null;
   maxInputTokens: number | null;
+  maxInputTokensSource: ResolvedLimitSource | null;
   maxOutputTokens: number | null;
+  maxOutputTokensSource: ResolvedLimitSource | null;
   defaultThinkingBudget: number;
   thinkingBudgetCap: number | null;
   thinkingOverhead: number | null;
@@ -518,130 +539,12 @@ function resolveVisionCapability(
   return null;
 }
 
-/**
- * Issue #6524: an operator-set `max_output_tokens` capability override (see
- * `src/lib/db/modelCapabilityOverrides.ts`) is the manual escape hatch for a
- * wrong/stale synced `limit_output` value (e.g. a provider's models.dev catalog
- * row reporting `limit_output` equal to `limit_context`). It already won over the
- * synced value in `getResolvedModelCapabilities().maxOutputTokens` — this helper
- * makes `getExplicitModelOutputCap()` (used by the reasoning-token-buffer clamp)
- * consult the same override so both read paths agree.
- */
-/**
- * Exact-match capability override lookup with intentional raw-alias fallback.
- *
- * An override may be stored under either the canonical model id or the exact
- * provider-scoped raw alias the operator used (e.g. `github/claude-opus-4.5`
- * resolving to canonical `claude-opus-4-5-20251101`). We consult the canonical
- * id first, then the raw alias — both are exact provider/model matches. There is
- * deliberately NO suffix/effort/family inheritance: an override for
- * `codex/gpt-5.6` never applies to `codex/gpt-5.6-high`.
- */
-function getCapabilityOverride(
-  resolved: { provider: string | null; model: string | null; rawModel: string | null },
-  key: "max_input_tokens" | "max_output_tokens"
-): number | null {
-  const canonical = getModelCapabilityOverride(resolved.provider, resolved.model, key);
-  if (canonical !== null) return canonical;
-  return resolved.rawModel && resolved.rawModel !== resolved.model
-    ? getModelCapabilityOverride(resolved.provider, resolved.rawModel, key)
-    : null;
-}
-
-function getContextOverride(
-  resolved: {
-    provider: string | null;
-    model: string | null;
-    rawModel: string | null;
-  },
-  snapshot?: ModelCapabilityResolutionSnapshot | null
-): number | null {
-  const bulk = snapshot?.contextOverrides ?? null;
-  const canonical = getModelContextOverride(resolved.provider, resolved.model, bulk);
-  if (canonical !== null) return canonical;
-  return resolved.rawModel && resolved.rawModel !== resolved.model
-    ? getModelContextOverride(resolved.provider, resolved.rawModel, bulk)
-    : null;
-}
-
-/**
- * Resolve a persisted context override by canonical id, then by the exact raw
- * alias supplied by the caller. Neither lookup inherits to related models.
- *
- * `snapshot` is the #9147 build-local bulk load; when supplied the on-demand
- * SQLite read is skipped and the preloaded nested map is used instead.
- */
-export function getResolvedModelContextOverride(input: CapabilityInput, snapshot?: ModelCapabilityResolutionSnapshot | null): number | null {
-  return getContextOverride(resolveCapabilityInput(input), snapshot);
-}
-
-function getInputTokenCapabilityOverride(resolved: {
-  provider: string | null;
-  model: string | null;
-  rawModel: string | null;
-}): number | null {
-  return getCapabilityOverride(resolved, "max_input_tokens");
-}
-
-function getOutputTokenCapabilityOverride(resolved: {
-  provider: string | null;
-  model: string | null;
-  rawModel: string | null;
-}): number | null {
-  return getCapabilityOverride(resolved, "max_output_tokens");
-}
-
-/**
- * Bulk-load friendly max_token override lookup (#9199). When a snapshot is
- * supplied its preloaded map is used; otherwise falls back to the on-demand
- * read (same precedence as getOutputTokenCapabilityOverride).
- */
-function getMaxTokenCapabilityOverride(
-  resolved: {
-    provider: string | null;
-    model: string | null;
-    rawModel: string | null;
-  },
-  snapshot?: ModelCapabilityResolutionSnapshot | null
-): number | null {
-  const bulk = snapshot?.maxTokenOverrides ?? null;
-  return (
-    getModelCapabilityOverride(resolved.provider, resolved.model, "max_output_tokens", bulk) ??
-    (resolved.rawModel && resolved.rawModel !== resolved.model
-      ? getModelCapabilityOverride(resolved.provider, resolved.rawModel, "max_output_tokens", bulk)
-      : null)
-  );
-}
-
-/**
- * Bulk-load friendly max_input_tokens override lookup (#9199): resolves from the
- * snapshot's preloaded map instead of a per-model SQLite read.
- */
-function getMaxInputTokenCapabilityOverride(
-  resolved: {
-    provider: string | null;
-    model: string | null;
-    rawModel: string | null;
-  },
-  snapshot: ModelCapabilityResolutionSnapshot
-): number | null {
-  const bulk = snapshot.maxInputTokenOverrides;
-  return (
-    getModelCapabilityOverride(resolved.provider, resolved.model, "max_input_tokens", bulk) ??
-    (resolved.rawModel && resolved.rawModel !== resolved.model
-      ? getModelCapabilityOverride(resolved.provider, resolved.rawModel, "max_input_tokens", bulk)
-      : null)
-  );
-}
-
 export function getExplicitModelOutputCap(
   input: CapabilityInput,
   snapshot?: ModelCapabilityResolutionSnapshot | null
 ): number | null {
   const resolved = resolveCapabilityInput(input);
-  const maxTokenOverride = snapshot
-    ? getMaxTokenCapabilityOverride(resolved, snapshot)
-    : getOutputTokenCapabilityOverride(resolved);
+  const maxTokenOverride = getOutputTokenCapabilityOverride(resolved, snapshot);
   if (maxTokenOverride !== null) return maxTokenOverride;
 
   const synced = getSyncedCapabilityForResolved(
@@ -661,9 +564,15 @@ export function getExplicitModelOutputCap(
 
 export function getResolvedModelCapabilities(
   input: CapabilityInput,
-  options?: ResolveModelCapabilitiesOptions,
+  optionsOrSnapshot?: ResolveModelCapabilitiesOptions | ModelCapabilityResolutionSnapshot,
   snapshot?: ModelCapabilityResolutionSnapshot | null
 ): ResolvedModelCapabilities {
+  const options = isResolutionSnapshot(optionsOrSnapshot) ? undefined : optionsOrSnapshot;
+  const resolutionSnapshot =
+    snapshot ??
+    (isResolutionSnapshot(optionsOrSnapshot)
+      ? optionsOrSnapshot
+      : (optionsOrSnapshot?.snapshot ?? null));
   // Reconciliation / auto-discovery needs the override-free catalog view so a
   // persisted override never feeds back into the comparison that (re)writes it.
   const usePersistedOverrides = options?.persistedOverrides !== false;
@@ -674,7 +583,7 @@ export function getResolvedModelCapabilities(
     resolved.provider,
     resolved.model,
     resolved.rawModel,
-    snapshot
+    resolutionSnapshot
   );
 
   const modalitiesInput = parseModalities(synced?.modalities_input);
@@ -722,9 +631,10 @@ export function getResolvedModelCapabilities(
   // reflects the real *total* window and wins over every static/synced source.
   // `maxInputTokens` still follows its own precedence chain; only when that
   // chain has no narrower source does it naturally fall back to this window.
-  const persistedContextWindow = usePersistedOverrides
-    ? getContextOverride(resolved, snapshot)
+  const persistedContextOverride = usePersistedOverrides
+    ? getContextOverrideRecord(resolved, resolutionSnapshot)
     : null;
+  const persistedContextWindow = persistedContextOverride?.realContext ?? null;
   const contextWindow =
     persistedContextWindow ??
     authoritativeContextWindow ??
@@ -732,17 +642,33 @@ export function getResolvedModelCapabilities(
     (typeof registryModel?.contextLength === "number" ? registryModel.contextLength : null) ??
     spec?.contextWindow ??
     null;
+  const contextWindowSource: ResolvedLimitSource | null = persistedContextOverride
+    ? persistedContextOverride.source
+    : authoritativeContextWindow !== null
+      ? "authoritative-fallback"
+      : typeof synced?.limit_context === "number"
+        ? "synced"
+        : typeof registryModel?.contextLength === "number"
+          ? "registry"
+          : typeof spec?.contextWindow === "number"
+            ? "spec"
+            : null;
 
-  const maxInputOverride = !usePersistedOverrides
-    ? null
-    : snapshot
-      ? getMaxInputTokenCapabilityOverride(resolved, snapshot)
-      : getInputTokenCapabilityOverride(resolved);
-  const maxTokenOverride = snapshot
-    ? getMaxTokenCapabilityOverride(resolved, snapshot)
-    : usePersistedOverrides
-      ? getOutputTokenCapabilityOverride(resolved)
-      : null;
+  const maxInputOverride = usePersistedOverrides
+    ? getInputTokenCapabilityOverride(resolved, resolutionSnapshot)
+    : null;
+  const maxTokenOverride = usePersistedOverrides
+    ? getOutputTokenCapabilityOverride(resolved, resolutionSnapshot)
+    : null;
+  const { value: maxInputTokens, source: maxInputTokensSource } = resolveClampedMaxInputLimit({
+    override: maxInputOverride,
+    registry:
+      typeof registryModel?.maxInputTokens === "number" ? registryModel.maxInputTokens : null,
+    authoritative: authoritativeContextWindow,
+    synced: synced?.limit_input ?? null,
+    contextWindow,
+    contextWindowSource,
+  });
 
   // Vision consults leaf static metadata for path-shaped ids; other capability
   // fields keep using the non-leaf `spec` from getStaticSpec() above.
@@ -755,7 +681,7 @@ export function getResolvedModelCapabilities(
       ? getCustomModelVisionOverride(
           resolved.provider,
           resolved.model,
-          snapshot?.customVisionOverrides
+          resolutionSnapshot ? (resolutionSnapshot.customVisionOverrides ?? new Map()) : undefined
         )
       : null;
 
@@ -794,28 +720,27 @@ export function getResolvedModelCapabilities(
     structuredOutput: synced?.structured_output ?? null,
     temperature: synced?.temperature ?? null,
     contextWindow,
-    maxInputTokens: (() => {
-      // Input cap is input-only. An explicit `max_input_tokens` override wins;
-      // otherwise fall back to the existing per-source input limits, then to the
-      // total window. The effective cap can never exceed the total window
-      // (input + output), so clamp it — but never double-count a requested
-      // output against this input cap.
-      const candidate =
-        maxInputOverride ??
-        (typeof registryModel?.maxInputTokens === "number" ? registryModel.maxInputTokens : null) ??
-        authoritativeContextWindow ??
-        synced?.limit_input ??
-        contextWindow;
-      return candidate !== null && contextWindow !== null
-        ? Math.min(candidate, contextWindow)
-        : candidate;
-    })(),
+    contextWindowSource,
+    // Input cap is input-only. Clamp it to total context without retaining
+    // provenance from a candidate that no longer produced the effective value.
+    maxInputTokens,
+    maxInputTokensSource,
     maxOutputTokens:
       maxTokenOverride ??
       synced?.limit_output ??
       (typeof registryModel?.maxOutputTokens === "number" ? registryModel.maxOutputTokens : null) ??
       spec?.maxOutputTokens ??
       null,
+    maxOutputTokensSource:
+      maxTokenOverride !== null
+        ? "capability-override"
+        : typeof synced?.limit_output === "number"
+          ? "synced"
+          : typeof registryModel?.maxOutputTokens === "number"
+            ? "registry"
+            : typeof spec?.maxOutputTokens === "number"
+              ? "spec"
+              : null,
     defaultThinkingBudget: spec?.defaultThinkingBudget ?? 0,
     thinkingBudgetCap: spec?.thinkingBudgetCap ?? null,
     thinkingOverhead: spec?.thinkingOverhead ?? null,

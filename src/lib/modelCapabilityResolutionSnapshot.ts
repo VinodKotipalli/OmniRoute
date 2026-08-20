@@ -9,7 +9,10 @@
  * collide via delimiter composition.
  */
 import { listModelCapabilityOverrides } from "@/lib/db/modelCapabilityOverrides";
-import { listModelContextOverrides } from "@/lib/db/modelContextOverrides";
+import {
+  listModelContextOverrides,
+  type ModelContextOverride,
+} from "@/lib/db/modelContextOverrides";
 import {
   listCustomModelVisionOverrides,
   type CustomModelVisionOverrideMap,
@@ -20,26 +23,31 @@ import {
   type CapabilitiesByProvider,
 } from "@/lib/modelsDevSync";
 
-/** Nested provider → model → numeric override map (collision-free). */
-export type NestedOverrideMap = ReadonlyMap<string, ReadonlyMap<string, number>>;
+/** Nested provider → model → override map (collision-free). */
+export type NestedOverrideMap<T = number> = ReadonlyMap<string, ReadonlyMap<string, T>>;
 
 export interface ModelCapabilityResolutionSnapshot {
   readonly synced: CapabilitiesByProvider;
-  readonly maxTokenOverrides: NestedOverrideMap;
-  readonly maxInputTokenOverrides: NestedOverrideMap;
+  readonly maxTokenOverrides?: NestedOverrideMap;
+  /** Historical output-override field retained for snapshot compatibility. */
+  readonly maxOutputTokenOverrides?: NestedOverrideMap;
+  readonly maxInputTokenOverrides?: NestedOverrideMap;
   readonly contextOverrides: NestedOverrideMap;
-  readonly customVisionOverrides: CustomModelVisionOverrideMap;
+  /** Added after the initial snapshot shape; legacy snapshots may omit it. */
+  readonly contextOverrideRecords?: NestedOverrideMap<ModelContextOverride>;
+  /** Added after the initial snapshot shape; legacy snapshots may omit it. */
+  readonly customVisionOverrides?: CustomModelVisionOverrideMap;
 }
 
 export interface ModelCapabilityResolutionSnapshotOptions {
   customModelVision?: CustomModelVisionOverrideReadOptions;
 }
 
-function setNestedOverride(
-  map: Map<string, Map<string, number>>,
+function setNestedOverride<T>(
+  map: Map<string, Map<string, T>>,
   provider: string,
   modelId: string,
-  value: number
+  value: T
 ): void {
   let byModel = map.get(provider);
   if (!byModel) {
@@ -70,8 +78,10 @@ export function createModelCapabilityResolutionSnapshot(
   }
 
   const contextOverrides = new Map<string, Map<string, number>>();
+  const contextOverrideRecords = new Map<string, Map<string, ModelContextOverride>>();
   for (const entry of listModelContextOverrides()) {
     setNestedOverride(contextOverrides, entry.provider, entry.modelId, entry.realContext);
+    setNestedOverride(contextOverrideRecords, entry.provider, entry.modelId, entry);
   }
 
   return {
@@ -79,6 +89,7 @@ export function createModelCapabilityResolutionSnapshot(
     maxTokenOverrides,
     maxInputTokenOverrides,
     contextOverrides,
+    contextOverrideRecords,
     customVisionOverrides: listCustomModelVisionOverrides(options.customModelVision),
   };
 }
