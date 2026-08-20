@@ -10,7 +10,11 @@ import { CORS_HEADERS, handleCorsOptions } from "@/shared/utils/cors";
 import { handleChat } from "@/sse/handlers/chat";
 import { createInjectionGuard } from "@/middleware/promptInjectionGuard";
 import { getRelayTokenByHash, checkRateLimit, recordRelayUsage } from "@/lib/db/relayProxies";
-import { buildErrorBody } from "@omniroute/open-sse/utils/error";
+import {
+  buildErrorBody,
+  parseUpstreamError,
+  sanitizeErrorMessage,
+} from "@omniroute/open-sse/utils/error";
 import {
   checkIpRateLimit,
   extractToken,
@@ -29,6 +33,7 @@ import {
 import { getProviderPluginManifestEntryForModel } from "@omniroute/open-sse/config/providerPluginManifestRegistry.ts";
 import { getProviderPluginManifestHeader } from "@omniroute/open-sse/config/providerPluginManifestUrl.ts";
 import { finalizeReadableStream } from "./streamFinalizer";
+import { stripStaleEncodingHeaders } from "@omniroute/open-sse/utils/upstreamResponseHeaders.ts";
 import {
   clearBifrostFailure,
   getActiveBifrostCooldown,
@@ -108,6 +113,32 @@ async function forwardToBifrost(
       headers.set("Content-Type", upstream.headers.get("Content-Type") ?? "application/json");
     }
 
+    // Issue #1: Bifrost (or the upstream behind it) may return plain text or HTML
+    // on a non-OK status (e.g. 502 from a sidecar, "invalid character 'd'" style
+    // proxy errors). Forwarding `upstream.body` raw leaks non-JSON into a client
+    // that expects OpenAI-shaped JSON, producing client-side parse failures.
+    // Normalize any non-OK response through parseUpstreamError + buildErrorBody so
+    // the client always receives a valid JSON error. (Hard rule #12.)
+    if (!upstream.ok) {
+      const parsed = await parseUpstreamError(upstream, null);
+      const errorBody = buildErrorBody(
+        parsed.statusCode,
+        sanitizeErrorMessage(parsed.message),
+        parsed.responseBody
+      );
+      const errorHeaders = stripStaleEncodingHeaders(headers);
+      errorHeaders.set("Content-Type", "application/json");
+      if (parsed.retryAfterMs && parsed.retryAfterMs > 0) {
+        errorHeaders.set("Retry-After", String(Math.ceil(parsed.retryAfterMs / 1000)));
+      }
+      clearTimeout(tid);
+      recordUsage(token.id, request, startTime, clientIp, userAgent, "error", parsed.statusCode);
+      return new Response(JSON.stringify(errorBody), {
+        status: parsed.statusCode,
+        headers: errorHeaders,
+      });
+    }
+
     if (wantsStream && upstream.body) {
       const stream = finalizeReadableStream(upstream.body, (error) => {
         clearTimeout(tid);
@@ -144,7 +175,8 @@ async function forwardToBifrost(
       startTime,
       clientIp,
       userAgent,
-      upstream.status < 500 ? "success" : "error",
+      // upstream.ok is guaranteed true here (the !upstream.ok branch above returns early).
+      "success",
       upstream.status
     );
 
