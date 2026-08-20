@@ -153,6 +153,7 @@ export function classifyFailure({
     normalized.includes("fetch failed") ||
     normalized.includes("network") ||
     normalized.includes("timeout") ||
+    normalized.includes("timed out") ||
     normalized.includes("econn") ||
     normalized.includes("enotfound") ||
     normalized.includes("socket")
