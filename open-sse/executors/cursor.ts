@@ -75,6 +75,11 @@ import {
   visibleComposerContentFromThinking,
   composerReasoningRemainder,
 } from "./cursor/composer.ts";
+import {
+  cleanCursorToken,
+  CursorServerConfigError,
+  resolveCursorAgentUrl,
+} from "./cursor/agentEndpoint.ts";
 import { getActiveSyncedCatalog } from "../../src/lib/db/models/activeSyncedCatalog.ts";
 // Composer helpers re-exported for external importers (tests).
 export {
@@ -185,10 +190,6 @@ function buildExecRejection(event: ExecServerEvent): Buffer | null {
       );
   }
 }
-
-const CURSOR_AGENT_HOST = "agentn.global.api5.cursor.sh";
-const CURSOR_AGENT_PATH = "/agent.v1.AgentService/Run";
-const CURSOR_AGENT_URL = `https://${CURSOR_AGENT_HOST}${CURSOR_AGENT_PATH}`;
 
 // Detect cloud environment (Edge runtime, Cloudflare Workers, etc.)
 const isCloudEnv = () => {
@@ -711,13 +712,13 @@ export class CursorExecutor extends BaseExecutor {
   }
 
   buildUrl() {
-    return CURSOR_AGENT_URL;
+    return PROVIDERS.cursor.baseUrl;
   }
 
   buildHeaders(credentials) {
-    const accessToken = credentials.accessToken;
+    const accessToken = credentials.accessToken || "";
     const ghostMode = credentials.providerSpecificData?.ghostMode !== false;
-    const cleanToken = accessToken.includes("::") ? accessToken.split("::")[1] : accessToken;
+    const cleanToken = cleanCursorToken(accessToken);
     const requestId = crypto.randomUUID();
     const traceParent = `00-${crypto.randomBytes(16).toString("hex")}-${crypto.randomBytes(8).toString("hex")}-01`;
 
@@ -1178,7 +1179,31 @@ export class CursorExecutor extends BaseExecutor {
   }
 
   async execute({ model, body, stream, credentials, signal, log, upstreamExtraHeaders }) {
-    const url = this.buildUrl();
+    let url: string;
+    try {
+      url = await resolveCursorAgentUrl(credentials, signal);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const headers = this.buildHeaders(credentials);
+      return {
+        response: new Response(
+          JSON.stringify({
+            error: {
+              message: sanitizeErrorMessage(message),
+              type: "connection_error",
+              code: "",
+            },
+          }),
+          {
+            status: err instanceof CursorServerConfigError ? err.status : HTTP_STATUS.SERVER_ERROR,
+            headers: { "Content-Type": "application/json" },
+          }
+        ),
+        url: this.buildUrl(),
+        headers,
+        transformedBody: body,
+      };
+    }
     const headers = this.buildHeaders(credentials);
     mergeUpstreamExtraHeaders(headers, upstreamExtraHeaders);
 
@@ -1252,8 +1277,10 @@ export class CursorExecutor extends BaseExecutor {
     if (isToolFollowUp) {
       session = cursorSessionManager.acquire(conversationId);
       // #9029: content-based session match when client lacks conversation_id.
-      if (!session && !body.conversation_id) session = cursorSessionManager.findByToolCallIds(
-        messages.filter(m => m.role === "tool" && m.tool_call_id).map(m => m.tool_call_id!));
+      if (!session && !body.conversation_id)
+        session = cursorSessionManager.findByToolCallIds(
+          messages.filter((m) => m.role === "tool" && m.tool_call_id).map((m) => m.tool_call_id!)
+        );
     }
 
     if (session) {
