@@ -8,6 +8,7 @@ import {
   isNonChatCatalogSurface,
 } from "@/lib/modelCapabilities";
 import { getModelCapabilityOverride } from "@/lib/db/modelCapabilityOverrides";
+import type { ModelCapabilityResolutionSnapshot } from "@/lib/modelCapabilityResolutionSnapshot";
 import {
   getAuthoritativeContextWindow,
   getAuthoritativeProviderContextWindow,
@@ -40,6 +41,7 @@ type JsonRecord = Record<string, unknown>;
 
 export interface CatalogEnrichmentSnapshot {
   modelsDevPricing: PricingByProvider | null;
+  capabilityResolution?: ModelCapabilityResolutionSnapshot;
   providerNodeIdsByPrefix?: Readonly<Record<string, string>>;
   /** #9147: build-local bulk load of synced capabilities + token/context overrides
    * so per-entry enrichment never hits SQLite again (see catalogResponse.ts). */
@@ -64,6 +66,7 @@ export interface CanonicalModelMetadata {
     toolCalling: boolean;
     reasoning: boolean;
     supportsThinking: boolean | null;
+    supportedThinkingEfforts: readonly string[] | null;
     supportsTools: boolean | null;
     vision: boolean | null;
     attachment: boolean | null;
@@ -90,6 +93,7 @@ export interface CanonicalModelMetadata {
       providerRegistry: boolean;
       staticSpec: boolean;
       syncedCapability: boolean;
+      reasoningEffortsOverride: boolean;
     };
   };
   modalities: {
@@ -249,6 +253,7 @@ export function getCanonicalModelMetadata(input: {
       toolCalling: resolved.toolCalling,
       reasoning: resolved.reasoning,
       supportsThinking: resolved.supportsThinking,
+      supportedThinkingEfforts: resolved.supportedThinkingEfforts,
       supportsTools: resolved.supportsTools,
       vision: resolved.supportsVision,
       attachment: resolved.attachment,
@@ -275,6 +280,7 @@ export function getCanonicalModelMetadata(input: {
         providerRegistry: Boolean(registryModel),
         staticSpec: Boolean(staticSpec),
         syncedCapability: Boolean(syncedCapability),
+        reasoningEffortsOverride: resolved.reasoningEffortsOverride,
       },
     },
     modalities: {
@@ -437,10 +443,6 @@ export function enrichCatalogModelEntry<T extends JsonRecord>(
     snapshot: snapshot?.capabilityResolutionSnapshot ?? null,
   });
   if (!metadata) return entry;
-  const registryModel = getRegistryModel(
-    metadata.providerAlias || metadata.provider,
-    metadata.model
-  );
 
   const nextEntry: JsonRecord = { ...entry };
   const existingName = asNonEmptyString(entry.name);
@@ -484,9 +486,9 @@ export function enrichCatalogModelEntry<T extends JsonRecord>(
           ...(metadata.capabilities.supportsThinking
             ? {
                 effort_tiers:
-                  registryModel?.supportedThinkingEfforts &&
-                  registryModel.supportedThinkingEfforts.length > 0
-                    ? [...registryModel.supportedThinkingEfforts]
+                  metadata.capabilities.supportedThinkingEfforts &&
+                  metadata.capabilities.supportedThinkingEfforts.length > 0
+                    ? [...metadata.capabilities.supportedThinkingEfforts]
                     : extendCodexGpt56EffortValues(
                         metadata.provider,
                         metadata.model,

@@ -58,9 +58,11 @@ import {
   getCatalogDiagnosticsHeaders,
   type CatalogEnrichmentSnapshot,
 } from "@/lib/modelMetadataRegistry";
+import { createModelCapabilityResolutionSnapshot } from "@/lib/modelCapabilityResolutionSnapshot";
 import { getModelsDevPricing, getSyncedCapability } from "@/lib/modelsDevSync";
 import { getModelSpec } from "@/shared/constants/modelSpecs";
 import { getModelsCatalogPrefixMode } from "@/shared/utils/featureFlags";
+import { buildReservedPrefixes, selectCompatibleNodeForPrefix } from "@/lib/providerNodePrefixes";
 import { applyCatalogPostFilters, finalizeCatalogResponse } from "./catalogResponse";
 import {
   isNoAuthProviderBlocked,
@@ -271,6 +273,7 @@ async function buildUnifiedModelsResponseCore(
     // #9147: yield after auth check before DB initialization prologue
     await yieldCatalogBuildTurn();
 
+    const capabilityResolutionSnapshot = createModelCapabilityResolutionSnapshot();
     const { aliasToProviderId, providerIdToAlias } = buildAliasMaps();
     const _qp = new URL(request.url).searchParams.get("prefix");
     const prefixMode =
@@ -323,6 +326,7 @@ async function buildUnifiedModelsResponseCore(
 
     // Build map of provider node ID to prefix and type for compatible providers
     const providerIdToPrefix: Record<string, string> = {};
+    const providerNodeIdByPrefix: Record<string, string> = {};
     const nodeIdToProviderType: Record<string, string> = {};
     for (const node of providerNodes) {
       const resolvedPrefix =
@@ -339,6 +343,12 @@ async function buildUnifiedModelsResponseCore(
       if (node.type) {
         nodeIdToProviderType[node.id] = node.type;
       }
+    }
+    const reservedProviderPrefixes = buildReservedPrefixes();
+    for (const prefix of new Set(Object.values(providerIdToPrefix))) {
+      if (reservedProviderPrefixes.has(prefix)) continue;
+      const winner = selectCompatibleNodeForPrefix(providerNodes, prefix);
+      if (winner?.id) providerNodeIdByPrefix[prefix] = winner.id;
     }
 
     // #8327: `resolveCanonicalProviderId`/`canonicalProviderId` only know the static
@@ -450,8 +460,12 @@ async function buildUnifiedModelsResponseCore(
     const getProviderPrefixes = (providerId: string, rawProvider: string) =>
       getProviderPrefixesFromMaps(aliasMaps, providerId, rawProvider);
 
-    const getComboTargetModelId = (target: ComboCatalogTarget) =>
-      getComboTargetModelIdFromMaps(aliasMaps, target);
+    const getComboTargetModelId = (target: ComboCatalogTarget) => {
+      const resolved = getComboTargetModelIdFromMaps(aliasMaps, target);
+      if (!resolved) return null;
+      const nodeId = providerNodeIdByPrefix[resolved.providerId];
+      return nodeId ? { ...resolved, providerId: nodeId } : resolved;
+    };
 
     const getComboTargetCatalogMetadata = (
       target: ComboCatalogTarget
@@ -462,11 +476,19 @@ async function buildUnifiedModelsResponseCore(
       const canonical = getCanonicalModelMetadata({
         provider: targetModel.providerId,
         model: targetModel.modelId,
+        snapshot: capabilityResolutionSnapshot,
       });
       if (!canonical) return null;
 
       const source = canonical.metadata.source;
-      if (!source.providerRegistry && !source.staticSpec && !source.syncedCapability) return null;
+      if (
+        !source.providerRegistry &&
+        !source.staticSpec &&
+        !source.syncedCapability &&
+        !source.reasoningEffortsOverride
+      ) {
+        return null;
+      }
 
       const providerId = canonical.provider || targetModel.providerId;
       const modelId = canonical.model || targetModel.modelId;
@@ -539,7 +561,7 @@ async function buildUnifiedModelsResponseCore(
           providerId,
           modelId,
           canonical.capabilities.supportsThinking,
-          registryModel?.supportedThinkingEfforts
+          canonical.capabilities.supportedThinkingEfforts ?? registryModel?.supportedThinkingEfforts
         )
       );
 
@@ -1740,9 +1762,8 @@ async function buildUnifiedModelsResponseCore(
       }
       enrichmentSnapshot = {
         modelsDevPricing,
-        providerNodeIdsByPrefix: Object.fromEntries(
-          Object.entries(providerIdToPrefix).map(([providerId, prefix]) => [prefix, providerId])
-        ),
+        capabilityResolutionSnapshot,
+        providerNodeIdsByPrefix: providerNodeIdByPrefix,
       };
       // The production profile identified pricing snapshot construction as the last
       // dominant synchronous stage. Let already-queued health checks run before the
