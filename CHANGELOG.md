@@ -169,6 +169,7 @@ _Living section — regenerated 2026-08-12 from all cycle commits (cycle open `e
 
 - **security(search)**: block SSRF via `/v1/search` `provider_options.baseUrl` for the Firecrawl search provider — the client-controlled override is now validated as a public URL before it is used to build the server-side fetch target, so a caller with a valid API key can no longer redirect search requests at loopback, RFC1918, or cloud-metadata hosts — thanks @zmf963
 - **providers**: honor `PATCH /api/providers/[id]` so `omniroute providers rotate` stops 405ing (the OpenAPI spec and CLI already use PATCH) (PR #10366)
+- **cli**: route provider test commands through configured connection test endpoints (#10570)
 - **executors**: fix internal timeout misclassified as client disconnect (499) for 7 niche executors — pass TimeoutError reason to controller.abort() (#8197 side-finding)
 - test(combo): guard auto/best-free never leaks the combo name as a model (#7754)
 - fix(vision-bridge): describe-model no longer returns unreachable "openai/gpt-4o-mini" when every vision-capable provider is unreachable on the instance — returns null instead and surfaces a clear error (#8430)
