@@ -298,6 +298,8 @@ export function claudeToOpenAIResponse(chunk, state) {
       if (!state.finishReasonSent) {
         const finishReason =
           state.finishReason || (state.toolCalls?.size > 0 ? "tool_calls" : "stop");
+        const cachedTokens = state.usage?.cache_read_input_tokens || 0;
+        const cacheCreationTokens = state.usage?.cache_creation_input_tokens || 0;
         const usageObj =
           state.usage && typeof state.usage === "object"
             ? {
@@ -310,6 +312,16 @@ export function claudeToOpenAIResponse(chunk, state) {
                         reasoning_tokens: state.usage.reasoning_tokens,
                         completion_tokens_details: {
                           reasoning_tokens: state.usage.reasoning_tokens,
+                        },
+                      }
+                    : {}),
+                  ...(cachedTokens > 0 || cacheCreationTokens > 0
+                    ? {
+                        prompt_tokens_details: {
+                          ...(cachedTokens > 0 ? { cached_tokens: cachedTokens } : {}),
+                          ...(cacheCreationTokens > 0
+                            ? { cache_creation_tokens: cacheCreationTokens }
+                            : {}),
                         },
                       }
                     : {}),
