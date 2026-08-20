@@ -1083,11 +1083,6 @@
       "count": 1
     }
   },
-  "src/lib/embeddings/service.ts": {
-    "no-restricted-imports": {
-      "count": 1
-    }
-  },
   "src/lib/evals/runtime.ts": {
     "no-restricted-imports": {
       "count": 1
