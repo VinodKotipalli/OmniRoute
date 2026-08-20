@@ -610,6 +610,93 @@ test("chatCore applies Responses input policy to openai-compatible targets", asy
   }
 });
 
+test("chatCore converts Chat reasoning_content for official DeepSeek Responses", async () => {
+  const { call, result } = await invokeChatCore({
+    provider: "deepseek",
+    model: "deepseek-v4-flash",
+    endpoint: "/v1/chat/completions",
+    body: {
+      model: "deepseek-v4-flash",
+      stream: false,
+      messages: [
+        {
+          role: "assistant",
+          content: "",
+          reasoning_content: "reasoning from the previous combo target",
+          tool_calls: [
+            {
+              id: "call_123",
+              type: "function",
+              function: { name: "echo_number", arguments: '{"value":166}' },
+            },
+          ],
+        },
+        { role: "tool", tool_call_id: "call_123", content: "166" },
+      ],
+    },
+    responseFormat: "openai-responses",
+  });
+
+  assert.equal(result.success, true);
+  assert.deepEqual(
+    call.body.input.filter((item) => item.type === "reasoning"),
+    [
+      {
+        type: "reasoning",
+        content: [{ type: "reasoning_text", text: "reasoning from the previous combo target" }],
+      },
+    ]
+  );
+});
+
+test("chatCore preserves native plaintext reasoning for DeepSeek but not Codex", async () => {
+  const reasoning = {
+    id: "rs_previous_target",
+    type: "reasoning",
+    content: [{ type: "reasoning_text", text: "reasoning already in Responses input" }],
+  };
+
+  const deepSeek = await invokeChatCore({
+    provider: "deepseek",
+    model: "deepseek-v4-flash",
+    endpoint: "/v1/responses",
+    body: {
+      model: "deepseek-v4-flash",
+      stream: false,
+      input: [reasoning, { type: "message", role: "user", content: "continue" }],
+    },
+    responseFormat: "openai-responses",
+  });
+  const codex = await invokeChatCore({
+    provider: "codex",
+    model: "gpt-5.1-codex",
+    endpoint: "/v1/responses",
+    credentials: { accessToken: "codex-token", providerSpecificData: {} },
+    body: {
+      model: "gpt-5.1-codex",
+      stream: false,
+      input: [reasoning, { type: "message", role: "user", content: "continue" }],
+    },
+    responseFormat: "openai-responses",
+  });
+
+  assert.equal(deepSeek.result.success, true);
+  assert.deepEqual(
+    deepSeek.call.body.input.filter((item) => item.type === "reasoning"),
+    [
+      {
+        type: "reasoning",
+        content: [{ type: "reasoning_text", text: "reasoning already in Responses input" }],
+      },
+    ]
+  );
+  assert.equal(codex.result.success, true);
+  assert.equal(
+    codex.call.body.input.some((item) => item.type === "reasoning"),
+    false
+  );
+});
+
 test("chatCore replays no-tool reasoning across public Responses turns", async () => {
   // Direct DeepSeek now speaks Responses upstream. Keep this regression on a
   // Chat-compatible DeepSeek host so it continues to exercise the Responses-to-Chat replay path.

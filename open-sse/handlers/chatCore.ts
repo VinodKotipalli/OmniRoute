@@ -1188,7 +1188,8 @@ export async function handleChatCore({
   if (targetFormat === FORMATS.OPENAI_RESPONSES && body && typeof body === "object") {
     applyResponsesInputPolicy(
       body as Record<string, unknown>,
-      credentials?.providerSpecificData?.preserveEncryptedReasoning === true
+      credentials?.providerSpecificData?.preserveEncryptedReasoning === true,
+      provider === "deepseek"
     );
   }
 

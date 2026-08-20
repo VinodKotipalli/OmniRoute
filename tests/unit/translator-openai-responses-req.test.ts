@@ -384,6 +384,99 @@ test("Chat -> Responses clamps call_id to 64 chars and keeps the pair matched (p
   );
 });
 
+test("Chat -> Responses converts assistant reasoning_content for official DeepSeek", () => {
+  const result = openaiToOpenAIResponsesRequest(
+    "deepseek-v4-flash",
+    {
+      messages: [
+        {
+          role: "assistant",
+          content: "",
+          reasoning_content: "Reasoning returned by the previous provider",
+          tool_calls: [
+            {
+              id: "call_123",
+              type: "function",
+              function: { name: "echo_number", arguments: '{"value":166}' },
+            },
+          ],
+        },
+        { role: "tool", tool_call_id: "call_123", content: "166" },
+      ],
+    },
+    false,
+    { _provider: "deepseek" }
+  ) as { input: Array<Record<string, unknown>> };
+
+  assert.deepEqual(result.input, [
+    {
+      type: "reasoning",
+      content: [{ type: "reasoning_text", text: "Reasoning returned by the previous provider" }],
+    },
+    {
+      type: "function_call",
+      call_id: "call_123",
+      name: "echo_number",
+      arguments: '{"value":166}',
+      status: "completed",
+    },
+    {
+      type: "function_call_output",
+      call_id: "call_123",
+      output: "166",
+      status: "completed",
+    },
+  ]);
+});
+
+test("Chat -> Responses does not synthesize plaintext reasoning for OpenAI targets", () => {
+  const result = openaiToOpenAIResponsesRequest(
+    "gpt-5.4",
+    {
+      messages: [
+        {
+          role: "assistant",
+          content: "answer",
+          reasoning_content: "must not become a client-generated reasoning item",
+        },
+      ],
+    },
+    false,
+    { _provider: "openai" }
+  ) as { input: Array<Record<string, unknown>> };
+
+  assert.equal(
+    result.input.some((item) => item.type === "reasoning"),
+    false,
+    "OpenAI Responses reasoning must remain server-generated"
+  );
+});
+
+test("Chat -> Responses does not synthesize plaintext reasoning for DeepSeek models behind other providers", () => {
+  for (const provider of ["openrouter", "openai-compatible-private-deepseek"]) {
+    const result = openaiToOpenAIResponsesRequest(
+      "deepseek/deepseek-v4-pro",
+      {
+        messages: [
+          {
+            role: "assistant",
+            content: "answer",
+            reasoning_content: "must remain scoped to the official DeepSeek provider",
+          },
+        ],
+      },
+      false,
+      { _provider: provider }
+    ) as { input: Array<Record<string, unknown>> };
+
+    assert.equal(
+      result.input.some((item) => item.type === "reasoning"),
+      false,
+      `${provider} must not inherit official DeepSeek plaintext reasoning semantics`
+    );
+  }
+});
+
 test("Chat -> Responses converts messages, tool calls, tool outputs, tools and pass-through params", () => {
   const result = openaiToOpenAIResponsesRequest(
     "gpt-4o",

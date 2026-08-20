@@ -255,6 +255,84 @@ test("handleChat applies task-aware routing when a semantic override is enabled"
   assert.equal(json.choices[0].message.content, "Task-routed response");
 });
 
+test("handleChat forwards replayed Chat reasoning through a combo to official DeepSeek Responses", async () => {
+  const target = await seedConnection("deepseek", {
+    apiKey: "sk-deepseek-reasoning-route",
+  });
+  await combosDb.createCombo({
+    name: "router-deepseek-reasoning",
+    strategy: "priority",
+    config: { maxRetries: 0, retryDelayMs: 0 },
+    models: [
+      {
+        kind: "model",
+        model: "deepseek/deepseek-v4-flash",
+        connectionId: target.id,
+      },
+    ],
+  });
+  const seenRequestBodies = [];
+
+  globalThis.fetch = async (_url, init = {}) => {
+    seenRequestBodies.push(JSON.parse(String(init.body)));
+    return new Response(
+      JSON.stringify({
+        id: "resp_reasoning_route",
+        object: "response",
+        status: "completed",
+        model: "deepseek-v4-flash",
+        output: [
+          {
+            id: "msg_reasoning_route",
+            type: "message",
+            role: "assistant",
+            status: "completed",
+            content: [{ type: "output_text", text: "continued", annotations: [] }],
+          },
+        ],
+        usage: { input_tokens: 4, output_tokens: 2, total_tokens: 6 },
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  };
+
+  const response = await handleChat(
+    buildRequest({
+      body: {
+        model: "router-deepseek-reasoning",
+        stream: false,
+        messages: [
+          {
+            role: "assistant",
+            content: "",
+            reasoning_content: "reasoning from an earlier combo target",
+            tool_calls: [
+              {
+                id: "call_123",
+                type: "function",
+                function: { name: "echo_number", arguments: '{"value":166}' },
+              },
+            ],
+          },
+          { role: "tool", tool_call_id: "call_123", content: "166" },
+        ],
+      },
+    })
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(seenRequestBodies.length, 1);
+  assert.deepEqual(
+    seenRequestBodies[0].input.filter((item) => item.type === "reasoning"),
+    [
+      {
+        type: "reasoning",
+        content: [{ type: "reasoning_text", text: "reasoning from an earlier combo target" }],
+      },
+    ]
+  );
+});
+
 test("handleChat keeps protected combo fallback separate from Global Fallback Model", async () => {
   await seedConnection("openai", { apiKey: "sk-openai-combo-route" });
   const ordinaryTarget = await seedConnection("deepseek", {

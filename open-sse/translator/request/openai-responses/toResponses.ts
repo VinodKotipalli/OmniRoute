@@ -86,6 +86,7 @@ export function openaiToOpenAIResponsesRequest(
   const root = toRecord(body);
   const credentialRecord = toRecord(credentials);
   const storeEnabled = isOpenAIResponsesStoreEnabled(credentialRecord.providerSpecificData);
+  const preservePlaintextReasoning = credentialRecord._provider === "deepseek";
   const result: JsonRecord = {
     model,
     input: [],
@@ -192,9 +193,19 @@ export function openaiToOpenAIResponsesRequest(
 
     // Convert assistant messages
     if (role === "assistant") {
-      // Skip reasoning_content — OpenAI Responses API requires server-generated
-      // rs_* IDs for reasoning items. Synthesizing client-side IDs (e.g. reasoning_N)
-      // causes 400 errors from Responses-compatible upstreams. (#224)
+      // OpenAI Responses requires server-generated rs_* IDs, so client reasoning
+      // remains omitted there. Official DeepSeek Responses is stateless and accepts
+      // the same Chat reasoning as a plaintext reasoning_text input item.
+      if (
+        preservePlaintextReasoning &&
+        typeof msg.reasoning_content === "string" &&
+        msg.reasoning_content.trim().length > 0
+      ) {
+        input.push({
+          type: "reasoning",
+          content: [{ type: "reasoning_text", text: msg.reasoning_content }],
+        });
+      }
 
       // Skip thinking blocks in array content — same rs_* ID constraint applies
 

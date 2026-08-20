@@ -100,6 +100,92 @@ test("applyResponsesInputPolicy still drops summary-only reasoning when enabled"
   ]);
 });
 
+test("plaintext reasoning policy preserves DeepSeek reasoning_text but not OpenAI-only fields", () => {
+  const body: Record<string, unknown> = {
+    input: [
+      {
+        id: "rs_plaintext123",
+        type: "reasoning",
+        content: [{ type: "reasoning_text", text: "reasoning to replay" }],
+        encrypted_content: "unsupported-encrypted-blob",
+        summary: [{ type: "summary_text", text: "unsupported summary" }],
+      },
+      { type: "reasoning", content: [{ type: "reasoning_text", text: "   " }] },
+      { type: "reasoning", content: [{ type: "output_text", text: "wrong part type" }] },
+      { type: "message", role: "user", content: [{ type: "input_text", text: "continue" }] },
+    ],
+  };
+
+  applyResponsesInputPolicy(body, false, true);
+
+  assert.deepEqual(body.input, [
+    {
+      type: "reasoning",
+      content: [{ type: "reasoning_text", text: "reasoning to replay" }],
+    },
+    { type: "message", role: "user", content: [{ type: "input_text", text: "continue" }] },
+  ]);
+});
+
+test("plaintext reasoning policy does not mutate shared combo fallback input", () => {
+  const original: Record<string, unknown> = {
+    input: [
+      {
+        id: "rs_shared123",
+        type: "reasoning",
+        content: [{ type: "reasoning_text", text: "reasoning shared across attempts" }],
+        encrypted_content: "encrypted-fallback-blob",
+        summary: [{ type: "summary_text", text: "fallback summary" }],
+      },
+      { type: "message", role: "user", content: [{ type: "input_text", text: "continue" }] },
+    ],
+  };
+  const originalSnapshot = JSON.stringify(original);
+  const deepSeekAttempt = { ...original };
+
+  applyResponsesInputPolicy(deepSeekAttempt, false, true);
+
+  assert.equal(JSON.stringify(original), originalSnapshot);
+  assert.notEqual(deepSeekAttempt.input, original.input);
+  assert.notEqual(
+    (deepSeekAttempt.input as Array<Record<string, unknown>>)[0],
+    (original.input as Array<Record<string, unknown>>)[0]
+  );
+  assert.notEqual(
+    (deepSeekAttempt.input as Array<Record<string, unknown>>)[0].content,
+    (original.input as Array<Record<string, unknown>>)[0].content
+  );
+
+  const encryptedFallback = { ...original };
+  applyResponsesInputPolicy(encryptedFallback, true);
+
+  assert.deepEqual((encryptedFallback.input as Array<Record<string, unknown>>)[0], {
+    type: "reasoning",
+    content: [{ type: "reasoning_text", text: "reasoning shared across attempts" }],
+    encrypted_content: "encrypted-fallback-blob",
+    summary: [{ type: "summary_text", text: "fallback summary" }],
+  });
+  assert.equal(JSON.stringify(original), originalSnapshot);
+});
+
+test("default Responses policy still drops plaintext reasoning", () => {
+  const body: Record<string, unknown> = {
+    input: [
+      {
+        type: "reasoning",
+        content: [{ type: "reasoning_text", text: "must not reach OpenAI or Codex" }],
+      },
+      { type: "message", role: "user", content: [{ type: "input_text", text: "continue" }] },
+    ],
+  };
+
+  applyResponsesInputPolicy(body);
+
+  assert.deepEqual(body.input, [
+    { type: "message", role: "user", content: [{ type: "input_text", text: "continue" }] },
+  ]);
+});
+
 test("filterToOpenAIFormat strips reasoning_content from assistant+tool_calls messages", () => {
   const body = {
     messages: [

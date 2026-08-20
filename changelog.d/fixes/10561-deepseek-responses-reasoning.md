@@ -1,0 +1,1 @@
+- **fix(combos):** preserve client-provided Chat reasoning when a combo routes a tool-call turn to official DeepSeek Responses, while keeping plaintext reasoning stripped for OpenAI and Codex targets ([#10550](https://github.com/diegosouzapw/OmniRoute/issues/10550)) — thanks @jackjinke
