@@ -30,16 +30,24 @@ import {
 } from "@omniroute/open-sse/utils/proxyDispatcher";
 import { fetch as undiciFetch } from "undici";
 import { decideProxyHealthAction, type ProxyProbeOutcome } from "./decision.ts";
+import {
+  resolveProbeConcurrency,
+  resolveProbeStaggerMs,
+  resolveProbeTarget,
+  waitForProbeSlot,
+} from "./probeTarget.ts";
 
 // #6246: a HEAD to the public probe target through a legit (often loaded) proxy
 // can exceed a few seconds; the old 5s ceiling produced false negatives that
 // flipped healthy proxies to inactive. Raise it and treat our own timeout as
 // inconclusive (see testOneProxy) rather than a proxy failure.
 const TEST_TIMEOUT_MS = 15000;
-// Reachability probe target for proxy health checks. Configurable so operators
-// can point it at an internal/self-hosted endpoint instead of the public default.
-const TEST_URL = process.env.PROXY_HEALTH_TEST_URL || "https://httpbin.org/ip";
-const CONCURRENCY = 10;
+// Probe target, batch size and intra-batch spacing come from probeTarget.ts, which the
+// auto-test endpoint reads too — one surface to tune instead of two that can drift apart.
+// Resolved at module load, as these constants always were.
+const TEST_URL = resolveProbeTarget();
+const CONCURRENCY = resolveProbeConcurrency();
+const STAGGER_MS = resolveProbeStaggerMs();
 const INITIAL_DELAY_MS = 60_000;
 const DEFAULT_INTERVAL_MS = 600_000;
 const DEFAULT_REMOVE_AFTER = 3;
@@ -154,7 +162,10 @@ async function sweep(): Promise<void> {
   for (let i = 0; i < proxies.length; i += CONCURRENCY) {
     const batch = proxies.slice(i, i + CONCURRENCY);
     const results = await Promise.allSettled(
-      batch.map(async (proxy) => {
+      batch.map(async (proxy, indexInBatch) => {
+        // Spread the departures: without this the whole batch leaves at the same tick and a
+        // shared egress IP hits the target with CONCURRENCY simultaneous requests.
+        await waitForProbeSlot(indexInBatch, STAGGER_MS);
         const outcome = await testOneProxy(proxy);
         return { id: proxy.id, outcome };
       })

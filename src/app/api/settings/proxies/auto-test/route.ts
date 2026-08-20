@@ -5,14 +5,20 @@ import { requireManagementAuth } from "@/lib/api/requireManagementAuth";
 import { createProxyDispatcher, proxyConfigToUrl } from "@omniroute/open-sse/utils/proxyDispatcher";
 import { fetch as undiciFetch } from "undici";
 import { resolveHealthCheckStatusWrite } from "@/lib/proxyHealth/statusPolicy";
+import {
+  resolveProbeConcurrency,
+  resolveProbeStaggerMs,
+  resolveProbeTarget,
+  waitForProbeSlot,
+} from "@/lib/proxyHealth/probeTarget";
 import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 import { createErrorResponse } from "@/lib/api/errorResponse";
 
 const TEST_TIMEOUT_MS = 5000;
-// Reachability probe target. Configurable so operators can point it at an
-// internal/self-hosted endpoint instead of the public default.
-const TEST_URL = process.env.PROXY_HEALTH_TEST_URL || "https://httpbin.org/ip";
-const CONCURRENCY = 10;
+// Shared with the background sweep — see src/lib/proxyHealth/probeTarget.ts.
+const TEST_URL = resolveProbeTarget();
+const CONCURRENCY = resolveProbeConcurrency();
+const STAGGER_MS = resolveProbeStaggerMs();
 
 const autoTestSchema = z.object({
   ids: z.array(z.string()).optional(),
@@ -130,7 +136,14 @@ export async function POST(request: Request) {
     const results: TestResult[] = [];
     for (let i = 0; i < proxiesToTest.length; i += CONCURRENCY) {
       const batch = proxiesToTest.slice(i, i + CONCURRENCY);
-      const batchResults = await Promise.allSettled(batch.map((proxy) => testSingleProxy(proxy)));
+      const batchResults = await Promise.allSettled(
+        batch.map(async (proxy, indexInBatch) => {
+          // Same intra-batch spacing as the background sweep: "Test All" fires the whole
+          // batch at once too, so it is just as capable of tripping a rate-limited target.
+          await waitForProbeSlot(indexInBatch, STAGGER_MS);
+          return testSingleProxy(proxy);
+        })
+      );
       for (const result of batchResults) {
         if (result.status === "fulfilled") results.push(result.value);
       }
