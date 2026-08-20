@@ -35,6 +35,7 @@ import {
   AUTHZ_HEADER_AUTH_KIND,
   AUTHZ_HEADER_PEER_LOCALITY,
 } from "@/server/authz/headers";
+import { readSubjectFromHeaders } from "@/server/authz/assertAuth";
 
 /**
  * Force this route to run dynamically per-request and never be cached/prerendered.
@@ -133,6 +134,8 @@ async function deriveAuditActor(request: Request): Promise<string> {
   } catch {
     /* fall through */
   }
+  const subject = readSubjectFromHeaders(request.headers);
+  if (subject.kind === "management_key" && subject.label === "local-cli-token") return "cli";
   try {
     if (await isCliTokenAuthValid(request)) return "cli";
   } catch {

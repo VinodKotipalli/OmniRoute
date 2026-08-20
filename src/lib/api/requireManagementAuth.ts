@@ -5,6 +5,7 @@ import { getApiKeyMetadata } from "@/lib/db/apiKeys";
 import { isCliTokenAuthValid } from "@/lib/middleware/cliTokenAuth";
 import { evaluateAccessTokenAuth } from "@/server/authz/accessTokenAuth";
 import { isTrustedLoopbackInternalServiceRequest } from "@/lib/api/internalServiceAuth";
+import { AUTHZ_HEADER_AUTH_KIND, AUTHZ_HEADER_AUTH_LABEL } from "@/server/authz/headers";
 import {
   MANAGE_SCOPE,
   hasManageScope as hasManageScopeShared,
@@ -52,7 +53,17 @@ export async function requireManagementAuth(
     return null;
   }
 
-  // CLI machine-id token allows localhost CLI access without an explicit API key.
+  // The authz pipeline strips the raw machine-token header after it validates it
+  // and forwards this trusted subject stamp to route handlers.
+  if (
+    request.headers.get(AUTHZ_HEADER_AUTH_KIND) === "management_key" &&
+    request.headers.get(AUTHZ_HEADER_AUTH_LABEL) === "local-cli-token"
+  ) {
+    return null;
+  }
+
+  // Direct/raw-Node callers without the central pipeline can still validate the
+  // CLI token here, including the trusted peer-locality stamp path.
   if (await isCliTokenAuthValid(request)) {
     return null;
   }

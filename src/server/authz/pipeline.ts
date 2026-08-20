@@ -26,6 +26,7 @@ import {
   AUTHZ_HEADER_REQUEST_ID,
   AUTHZ_HEADER_ROUTE_CLASS,
   AUTHZ_TRUSTED_HEADERS,
+  CLI_TOKEN_HEADER,
   PEER_IP_HEADER,
   VIA_PROXY_HEADER,
 } from "./headers";
@@ -330,6 +331,11 @@ export async function runAuthzPipeline(
     process.env.OMNIROUTE_PEER_STAMP_TOKEN
   );
   requestHeaders.set(AUTHZ_HEADER_PEER_LOCALITY, peerLocality);
+  // Local CLI-token auth is decided centrally above. Preserve that trusted
+  // decision for route-level requireManagementAuth without forwarding the
+  // machine token itself: custom client auth headers are stripped before the
+  // route runs, so the route consumes only the stamped auth subject.
+  requestHeaders.delete(CLI_TOKEN_HEADER);
 
   if (method === "OPTIONS") {
     const preflight = new NextResponse(null, { status: 204 });
