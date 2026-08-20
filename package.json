@@ -291,7 +291,7 @@
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",
     "ioredis": "^5.10.1",
-    "jose": "^6.2.8",
+    "jose": "^6.2.9",
     "js-yaml": "^5.3.0",
     "jsonc-parser": "^3.3.1",
     "lowdb": "^7.0.1",
@@ -338,10 +338,10 @@
     "zod": "^4.4.3",
     "zustand": "^5.0.15",
     "@huggingface/transformers": "^4.2.0",
-    "onnxruntime-node": "~1.24.3"
+    "onnxruntime-node": "~1.27.0"
   },
   "optionalDependencies": {
-    "@atjsh/llmlingua-2": "2.0.3",
+    "@atjsh/llmlingua-2": "3.0.0",
     "@tensorflow/tfjs": "4.22.0",
     "better-sqlite3": "^13.0.2",
     "js-tiktoken": "^1.0.20",
